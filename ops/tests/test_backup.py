@@ -123,9 +123,11 @@ class BackupTests(unittest.TestCase):
             self.assertEqual(len(manifest['missing']), 1)
             with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
                 data = tar.extractfile(db.as_posix().lstrip('/')).read()
+            self.assertEqual(data[18:20], b'\x01\x01')
             with sqlite3.connect(':memory:') as restored:
                 restored.deserialize(data)
                 self.assertEqual(restored.execute('SELECT value FROM sample').fetchone()[0], 42)
+                self.assertEqual(restored.execute('PRAGMA quick_check').fetchone()[0], 'ok')
 
 
 if __name__ == '__main__':

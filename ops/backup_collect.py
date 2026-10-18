@@ -75,6 +75,10 @@ def collect(paths=PATHS, release=True):
                         with closing(sqlite3.connect(':memory:')) as dst:
                             src.backup(dst)
                             data = dst.serialize()
+                            # The online backup is complete. Make its serialized image usable
+                            # without WAL sidecars, including sqlite3_deserialize in recovery tests.
+                            # https://www.sqlite.org/c3ref/deserialize.html
+                            data = data[:18] + b'\x01\x01' + data[20:]
                 else:
                     with path.open('rb') as stream:
                         data = stream.read(LIMIT - total + 1)

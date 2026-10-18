@@ -47,3 +47,5 @@ Phục hồi lên Pi thật cần chọn đúng cấu hình, cài lại các gó
 ## Kiểm tra GitHub
 
 Workflow `Source checks` chạy trên push/PR và khi bấm Run workflow: cú pháp Python/shell, bộ unittest Linux, biểu đồ/polling JavaScript, kiểm thử mã hóa/phục hồi và Gitleaks toàn lịch sử Git với đầu ra đã che bí mật. Không kết nối hoặc triển khai Pi, không cần mật khẩu Pi. Actions ghim SHA; binary Gitleaks ghim phiên bản và SHA-256. Dependabot chỉ đề nghị cập nhật Actions, không tự merge. Các phiên bản Python dependency vẫn trong dải khai báo, chưa có lockfile tái lập đầy đủ.
+
+Snapshot SQLite được chuẩn hóa về rollback-journal sau online backup để mở độc lập không cần WAL sidecar, theo [hướng dẫn SQLite](https://www.sqlite.org/c3ref/deserialize.html). GitHub kiểm tra thêm trên Windows để thực thi DPAPI CurrentUser và cú pháp PowerShell.
