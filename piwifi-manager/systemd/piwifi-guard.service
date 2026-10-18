@@ -1,0 +1,9 @@
+[Unit]
+Description=Raspberry Pi Wi-Fi recovery guard
+After=NetworkManager.service
+Requires=NetworkManager.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/piwifi-guard
+TimeoutStartSec=180

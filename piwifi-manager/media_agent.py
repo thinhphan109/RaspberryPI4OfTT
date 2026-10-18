@@ -1,0 +1,494 @@
+"""RAM queue + fixed YouTube controls. No public browser debugging endpoint."""
+import json
+from datetime import datetime
+from zoneinfo import ZoneInfo
+import math
+import os
+from pathlib import Path
+import re
+import socketserver
+import subprocess
+import threading
+import time
+import urllib.parse
+import urllib.request
+import websocket
+from media_policy import PlaybackPolicy
+import audio_control
+
+PORT=18769
+HTTP=urllib.request.build_opener(urllib.request.ProxyHandler({}))
+LOCK=threading.RLock()
+QUEUE=[]
+CURRENT=None
+ERROR=''
+END_LATCH=False
+VOLUME=35
+VOLUME_SCRIPT=None
+HOOK_VOLUME=None
+WS=None
+WS_TARGET=None
+SEQUENCE=0
+NONSTOP=False
+MANUAL_PAUSE=False
+LAST_URL=''
+LAST_PROGRESS=None
+PROGRESS_AT=0
+RECOVERY_AT=0
+RECOVERY_COUNT=0
+NONSTOP_NOTE='Đã tắt'
+CONFIG=Path.home()/'.local/state/pi-media/nonstop.json'
+VOLUME_SCHEDULE=dict(enabled=False,start='22:00',end='07:00',limit=30)
+POLICY=PlaybackPolicy()
+POLICY_NOTE=''
+POLICY_RETRY_AT=0
+STANDBY=False
+WAKE_URL=''
+WAKE_UNTIL=0
+
+def validate_schedule(d):
+    if not isinstance(d,dict) or type(d.get('enabled')) is not bool:
+        raise ValueError('Lịch âm lượng cần giá trị bật/tắt')
+    for key in ('start','end'):
+        if not isinstance(d.get(key),str) or not re.fullmatch(r'(?:[01]\d|2[0-3]):[0-5]\d',d[key]):
+            raise ValueError('Giờ phải có dạng HH:MM')
+    if d['start']==d['end']:raise ValueError('Giờ bắt đầu và kết thúc phải khác nhau')
+    if type(d.get('limit')) is not int or not 0<=d['limit']<=100:
+        raise ValueError('Giới hạn âm lượng phải từ 0 đến 100')
+    return {k:d[k] for k in ('enabled','start','end','limit')}
+
+def volume_policy(now=None):
+    now=now or datetime.now(ZoneInfo('Asia/Ho_Chi_Minh'))
+    at=now.strftime('%H:%M');s=VOLUME_SCHEDULE
+    inside=(s['start']<=at<s['end']) if s['start']<s['end'] else (at>=s['start'] or at<s['end'])
+    return dict(s,active=s['enabled'] and inside,timezone='Asia/Ho_Chi_Minh')
+
+def limited_volume(value):
+    s=volume_policy()
+    return min(value,s['limit'] if s['active'] else 100,POLICY.sleep_cap())
+
+def volume_tick(s):
+    global VOLUME
+    cap=volume_policy()
+    if (not cap['active'] and not POLICY.sleep) or not s.get('has_video'):return
+    VOLUME=limited_volume(s.get('volume',VOLUME))
+    if HOOK_VOLUME!=VOLUME:install_volume_hook(VOLUME)
+    # Only lower volume; ending a window never raises it. No periodic disk write.
+    evaluate(f'(()=>{{window.__piMediaVolume={VOLUME}/100;const v=document.querySelector("video");if(v&&v.volume>{VOLUME}/100)v.volume={VOLUME}/100;return true}})()')
+
+def save_nonstop():
+    """Write only explicit user actions, never periodic playback samples."""
+    CONFIG.parent.mkdir(parents=True,exist_ok=True,mode=0o700)
+    data=json.dumps(dict(enabled=NONSTOP,manual_pause=MANUAL_PAUSE,url=LAST_URL,volume=VOLUME,volume_schedule=VOLUME_SCHEDULE,preferences=POLICY.dump(),standby=STANDBY))
+    tmp=CONFIG.with_suffix('.tmp');tmp.write_text(data);tmp.chmod(0o600);tmp.replace(CONFIG)
+
+def load_nonstop():
+    global NONSTOP,MANUAL_PAUSE,LAST_URL,VOLUME,VOLUME_SCHEDULE,STANDBY
+    try:
+        d=json.loads(CONFIG.read_text())
+        if not isinstance(d,dict):return
+        NONSTOP=d.get('enabled') is True;MANUAL_PAUSE=d.get('manual_pause') is True
+        STANDBY=d.get('standby') is True
+        POLICY.load(d.get('preferences'))
+        if type(d.get('volume')) in (int,float) and 0<=d['volume']<=100:VOLUME=d['volume']
+        if 'volume_schedule' in d:VOLUME_SCHEDULE=validate_schedule(d['volume_schedule'])
+        LAST_URL=youtube_url(d.get('url'))
+    except (OSError,ValueError,TypeError):LAST_URL=''
+
+def youtube_url(value):
+    if not isinstance(value,str) or len(value)>2048:raise ValueError('Link YouTube không hợp lệ')
+    p=urllib.parse.urlsplit(value)
+    if p.scheme!='https' or p.username or p.password or p.port:raise ValueError('Chỉ nhận link HTTPS YouTube')
+    if p.hostname=='youtu.be':ident=p.path.strip('/')
+    elif p.hostname in ('youtube.com','www.youtube.com','m.youtube.com','music.youtube.com'):
+        if p.path=='/watch':ident=urllib.parse.parse_qs(p.query).get('v',[''])[0]
+        elif p.path.startswith(('/shorts/','/live/')):ident=p.path.split('/')[2]
+        else:raise ValueError('Gửi link của một video, không phải trang tìm kiếm/playlist')
+    else:raise ValueError('Chỉ nhận link YouTube')
+    if not re.fullmatch(r'[A-Za-z0-9_-]{11}',ident):raise ValueError('Mã video YouTube không hợp lệ')
+    return 'https://www.youtube.com/watch?v='+ident
+
+def pages():
+    with HTTP.open(f'http://127.0.0.1:{PORT}/json/list',timeout=2) as r:
+        return [p for p in json.load(r) if p.get('type')=='page']
+
+def target():
+    rows=pages()
+    for p in rows:
+        if p['url'].startswith(('https://www.youtube.com/','https://music.youtube.com/')):return p
+    if len(rows)==1 and rows[0]['url']=='about:blank':return rows[0]
+    raise ValueError('Cửa sổ Media không ở YouTube; bấm Mở cửa sổ Media hoặc kiểm tra desktop')
+
+def cdp(method,params=None):
+    global WS,WS_TARGET,SEQUENCE
+    p=target();url=p['webSocketDebuggerUrl']
+    if not url.startswith(f'ws://127.0.0.1:{PORT}/'):raise ValueError('Invalid browser endpoint')
+    if WS is None or WS_TARGET!=p['id']:
+        if WS is not None:WS.close()
+        WS=websocket.create_connection(url,timeout=3,suppress_origin=True);WS_TARGET=p['id']
+    SEQUENCE+=1;ident=SEQUENCE
+    try:
+        WS.send(json.dumps({'id':ident,'method':method,'params':params or {}}))
+        while True:
+            r=json.loads(WS.recv())
+            if r.get('id')==ident:
+                if 'error' in r:raise ValueError('Trình duyệt từ chối thao tác')
+                return r.get('result',{})
+    except websocket.WebSocketTimeoutException:
+        WS.close();WS=None
+        raise ValueError('Chromium đang chờ trang/hộp thoại; kiểm tra desktop Pi (keyring hoặc đăng nhập).')
+    except Exception:
+        WS.close();WS=None
+        raise
+
+def evaluate(expression):
+    r=cdp('Runtime.evaluate',{'expression':expression,'returnByValue':True,'awaitPromise':True})
+    if r.get('exceptionDetails'):raise ValueError('Trang chưa sẵn sàng hoặc bị chặn tự phát')
+    return r.get('result',{}).get('value')
+
+def open_browser():
+    if STANDBY:raise ValueError('Media đang nghỉ; bấm Bật Media trước')
+    subprocess.run(['systemctl','--user','start','pi-media-browser'],check=True,timeout=8,capture_output=True)
+
+def set_power(enabled):
+    """Only the dedicated browser; networking, DNS and desktop stay available."""
+    global STANDBY,LAST_URL,VOLUME,WS,WS_TARGET,VOLUME_SCRIPT,HOOK_VOLUME,RECOVERY_AT,RECOVERY_COUNT,WAKE_URL,WAKE_UNTIL
+    if type(enabled) is not bool:raise ValueError('Trạng thái Media cần giá trị bật/tắt')
+    if enabled:
+        previous=STANDBY;STANDBY=False
+        try:save_nonstop();open_browser()
+        except Exception:
+            STANDBY=previous;save_nonstop();raise
+        RECOVERY_AT=0;RECOVERY_COUNT=0
+        if previous and NONSTOP and LAST_URL and not MANUAL_PAUSE and not POLICY.sleep_state()['expired']:
+            if not POLICY.reason(LAST_URL.split('v=')[1],automatic=False):
+                WAKE_URL=LAST_URL;WAKE_UNTIL=time.monotonic()+30
+    else:
+        if not STANDBY:
+            current=status()
+            if current.get('url'):LAST_URL=current['url']
+            level=current.get('volume')
+            if current.get('has_video') and type(level) in (int,float) and math.isfinite(level) and 0<=level<=100:VOLUME=level
+        subprocess.run(['systemctl','--user','stop','pi-media-browser'],check=True,timeout=8,capture_output=True)
+        previous=STANDBY;STANDBY=True
+        try:save_nonstop()
+        except Exception:STANDBY=previous;raise
+        if WS:
+            try:WS.close()
+            except Exception:pass
+        WS=None;WS_TARGET=None;VOLUME_SCRIPT=None;HOOK_VOLUME=None
+        WAKE_URL=''
+    return status()
+
+def resume_tick():
+    """Navigate explicitly after cold start; homepage previews are not playback."""
+    global WAKE_URL
+    if not WAKE_URL:return
+    if STANDBY or MANUAL_PAUSE or POLICY.sleep_state()['expired'] or time.monotonic()>WAKE_UNTIL:
+        WAKE_URL='';return
+    play(WAKE_URL)
+    WAKE_URL=''
+
+def install_volume_hook(level):
+    global VOLUME_SCRIPT,HOOK_VOLUME
+    if VOLUME_SCRIPT:
+        try:cdp('Page.removeScriptToEvaluateOnNewDocument',{'identifier':VOLUME_SCRIPT})
+        except Exception:pass
+    # YouTube may reset video volume on navigation. Apply before autoplay starts.
+    script=f"""window.__piMediaVolume={level}/100;
+const applyPiVolume=e=>{{const v=e.target;if(v instanceof HTMLMediaElement && Math.abs(v.volume-window.__piMediaVolume)>0.001)v.volume=window.__piMediaVolume}};
+for(const event of ['loadedmetadata','play','volumechange'])document.addEventListener(event,applyPiVolume,true);"""
+    VOLUME_SCRIPT=cdp('Page.addScriptToEvaluateOnNewDocument',{'source':script})['identifier']
+    HOOK_VOLUME=level
+
+def play(url):
+    global CURRENT,END_LATCH,POLICY_RETRY_AT
+    if POLICY.sleep_state()['expired']:raise ValueError('Đã hết hẹn giờ ngủ; bấm Phát để nghe tiếp')
+    install_volume_hook(limited_volume(VOLUME))
+    cdp('Page.navigate',{'url':url});CURRENT=url;END_LATCH=False
+    POLICY.observe(url.split('v=')[1]);POLICY_RETRY_AT=time.monotonic()+8
+
+STATE_JS="""(()=>{const v=document.querySelector('video');const n=x=>Number.isFinite(x)?x:0;
+const next=document.querySelector('.ytp-next-button');const href=next?.href||'';
+const id=new URL(href||location.href,location.href).searchParams.get('v');
+const a=[...document.querySelectorAll('ytd-compact-video-renderer a#video-title,yt-lockup-view-model a.ytLockupMetadataViewModelTitle')].find(a=>new URL(a.href,location.href).searchParams.get('v')===id);
+return {title:(document.querySelector('h1.ytd-watch-metadata')?.textContent||document.title).trim().slice(0,300),
+up_next:{url:href,title:(a?.getAttribute('title')||a?.textContent||next?.getAttribute('data-tooltip-text')||'Bài YouTube đề xuất').trim().slice(0,300)},
+recommendations:[...document.querySelectorAll('ytd-compact-video-renderer a#video-title,yt-lockup-view-model a.ytLockupMetadataViewModelTitle')].slice(0,40).map(a=>({url:a.href,title:(a.getAttribute('title')||a.textContent||'Video đề xuất').trim().slice(0,300)})),
+url:location.href,has_video:!!v,paused:v?v.paused:true,ended:v?v.ended:false,
+position:v?n(v.currentTime):0,duration:v?n(v.duration):0,volume:v?Math.round(v.volume*100):0,
+muted:v?v.muted:false,ad:!!document.querySelector('.ad-showing'),
+autoplay:document.querySelector('.ytp-autonav-toggle-button')?.getAttribute('aria-checked')==='true',
+notice:v?.error?'Video báo lỗi; kiểm tra trên desktop.':''};})()"""
+
+def next_video(current,rows):
+    choices=[dict(url=u,title='Video '+u.split('v=')[1],source='Hàng đợi của bạn',queue_index=i) for i,u in enumerate(QUEUE)]
+    choices.extend(dict(r,source='YouTube đề xuất') for r in rows if isinstance(r,dict))
+    seen=set()
+    for row in choices:
+        try:url=youtube_url(row.get('url'))
+        except ValueError:continue
+        if url in seen or url==current:continue
+        seen.add(url)
+        if POLICY.reason(url.split('v=')[1]):continue
+        return dict(url=url,title=str(row.get('title') or 'Bài YouTube đề xuất')[:300],source=row['source'],**({'queue_index':row['queue_index']} if 'queue_index' in row else {}))
+    return None
+
+def move_next(s):
+    global LAST_URL,MANUAL_PAUSE,POLICY_NOTE
+    choice=s.get('up_next')
+    if not choice:raise ValueError('Chưa có bài phù hợp; chọn video khác hoặc điều chỉnh chống lặp')
+    play(youtube_url(choice['url']))
+    if 'queue_index' in choice:QUEUE.pop(choice['queue_index'])
+    LAST_URL=choice['url'];MANUAL_PAUSE=False;POLICY_NOTE=''
+
+PAUSE_JS="""(()=>{const v=document.querySelector('video');if(v)v.pause();const b=document.querySelector('.ytp-autonav-toggle-button');if(b&&b.getAttribute('aria-checked')==='true')b.click();return true})()"""
+
+def sleep_tick(s):
+    global NONSTOP_NOTE
+    if not POLICY.sleep_state()['expired']:return False
+    NONSTOP_NOTE='Hết hẹn giờ ngủ; bấm Phát để nghe tiếp'
+    if s.get('connected'):evaluate(PAUSE_JS)
+    return True
+
+def preference_tick(s,now=None):
+    global POLICY_RETRY_AT,POLICY_NOTE,MANUAL_PAUSE
+    now=time.monotonic() if now is None else now
+    if not s.get('url') or s.get('ad') or now<POLICY_RETRY_AT:return False
+    ident=s['url'].split('v=')[1]
+    # Revisit checks apply to automatic navigation; explicit Play marks tracked.
+    reason=POLICY.reason(ident,automatic=ident!=POLICY.tracked)
+    if reason:
+        POLICY_NOTE=reason+' · đang chọn bài khác'
+        POLICY_RETRY_AT=now+8
+        if s.get('up_next'):move_next(s)
+        else:
+            evaluate(PAUSE_JS);MANUAL_PAUSE=True
+            POLICY_NOTE='Chưa có bài phù hợp; chọn bài khác hoặc điều chỉnh chống lặp'
+        return True
+    if s.get('has_video'):POLICY.observe(ident,now)
+    return False
+
+def status():
+    if STANDBY:
+        return dict(standby=True,connected=False,title='Media đang nghỉ',queue=list(QUEUE),error='',nonstop=NONSTOP,manual_pause=MANUAL_PAUSE,nonstop_note='Đã đóng trình duyệt; Nonstop chờ bạn bật Media',volume_schedule=volume_policy(),up_next=None,preferences=POLICY.summary(),policy_note='Dashboard, Wi-Fi và DNS vẫn hoạt động.')
+    try:
+        d=evaluate(STATE_JS);d['connected']=True
+        if not d.get('title') and not d.get('has_video'):
+            d['notice']='Trang chưa tải. Kiểm tra hộp thoại keyring trên desktop Pi rồi thử lại.'
+        # Export only the dedicated player's YouTube video, never arbitrary URLs.
+        try:d['url']=youtube_url(d['url'])
+        except ValueError:d['url']=''
+        rows=[d.pop('up_next',None)]+d.pop('recommendations',[])
+        d['up_next']=next_video(d['url'],rows);d['volume_schedule']=volume_policy()
+        d['queue']=list(QUEUE);d['queue_note']='Hàng đợi trong RAM; mất khi agent khởi động lại.'
+        d['error']=ERROR;d['standby']=False
+        d.update(nonstop=NONSTOP,manual_pause=MANUAL_PAUSE,nonstop_note=NONSTOP_NOTE)
+        d.update(preferences=POLICY.summary(),policy_note=POLICY_NOTE)
+        return d
+    except Exception:
+        return dict(connected=False,title='Chưa kết nối cửa sổ Media',queue=list(QUEUE),error=ERROR,nonstop=NONSTOP,manual_pause=MANUAL_PAUSE,nonstop_note=NONSTOP_NOTE,volume_schedule=volume_policy(),up_next=None,preferences=POLICY.summary(),policy_note=POLICY_NOTE)
+
+def dispatch(d):
+    global ERROR,END_LATCH,VOLUME,NONSTOP,MANUAL_PAUSE,LAST_URL,RECOVERY_AT,RECOVERY_COUNT,NONSTOP_NOTE,VOLUME_SCHEDULE,POLICY_NOTE,WAKE_URL
+    action=d.get('action','status')
+    if action=='audio':
+        payload=d.get('payload')
+        if not isinstance(payload,dict):raise ValueError('Yêu cầu âm thanh không hợp lệ')
+        return audio_control.dispatch(payload)
+    if action=='status':return status()
+    if action=='power':return set_power(d.get('enabled'))
+    if action=='start':return set_power(True)
+    if STANDBY and action in ('play','next','toggle','seek','volume','dislike'):
+        raise ValueError('Media đang nghỉ; bấm Bật Media trước')
+    if action in ('play','next','toggle'):WAKE_URL=''
+    if action=='repeat':
+        previous=POLICY.repeat.copy();POLICY.configure_repeat(d.get('setting'))
+        try:save_nonstop()
+        except Exception:POLICY.repeat=previous;raise
+        return status()
+    if action=='undislike':
+        ident=d.get('id')
+        if not isinstance(ident,str) or ident not in POLICY.disliked:raise ValueError('Không tìm thấy bài trong danh sách')
+        title=POLICY.disliked.pop(ident)
+        try:save_nonstop()
+        except Exception:POLICY.disliked[ident]=title;raise
+        return status()
+    if action=='dislike':
+        current=status()
+        if not current.get('url') or not current.get('has_video') or current.get('ad'):raise ValueError('Chọn bài đang phát, ngoài thời gian quảng cáo')
+        ident=current['url'].split('v=')[1];previous=POLICY.disliked.copy()
+        POLICY.dislike(ident,current.get('title'));LAST_URL=current['url']
+        try:save_nonstop()
+        except Exception:POLICY.disliked=previous;raise
+        try:move_next(status())
+        except ValueError:
+            evaluate(PAUSE_JS);MANUAL_PAUSE=True
+            POLICY_NOTE='Đã ghi nhận không thích; chưa có bài phù hợp để chuyển'
+        save_nonstop();return status()
+    if action=='sleep':
+        current=status()
+        if not current.get('has_video'):raise ValueError('Mở một video trước khi hẹn giờ ngủ')
+        old_sleep=POLICY.sleep;old_deadline=POLICY.deadline
+        POLICY.start_sleep(d.get('minutes'),current.get('volume',VOLUME))
+        LAST_URL=current.get('url') or LAST_URL
+        try:save_nonstop()
+        except Exception:POLICY.sleep=old_sleep;POLICY.deadline=old_deadline;raise
+        return status()
+    if action=='sleep_cancel':
+        if POLICY.sleep_state()['expired']:raise ValueError('Hẹn giờ đã kết thúc; bấm Phát để nghe tiếp')
+        POLICY.cancel_sleep();save_nonstop();return status()
+    if action=='volume_schedule':
+        setting=validate_schedule(d.get('schedule'))
+        previous=VOLUME_SCHEDULE
+        VOLUME_SCHEDULE=setting
+        try:save_nonstop()
+        except Exception:VOLUME_SCHEDULE=previous;raise
+        volume_tick(status())
+        return status()
+    if action=='nonstop':
+        if type(d.get('enabled'))!=bool:raise ValueError('Nonstop cần giá trị bật/tắt')
+        NONSTOP=d['enabled'];MANUAL_PAUSE=False;RECOVERY_AT=0;RECOVERY_COUNT=0
+        current=status()
+        if current.get('url'):LAST_URL=current['url']
+        if current.get('has_video'):VOLUME=current.get('volume',VOLUME)
+        NONSTOP_NOTE='Đang theo dõi' if NONSTOP else 'Đã tắt';save_nonstop();return status()
+    if action in ('play','enqueue'):
+        url=youtube_url(d.get('url'))
+        if action=='enqueue':
+            if len(QUEUE)>=50:raise ValueError('Hàng đợi tối đa 50 video')
+            QUEUE.append(url)
+        else:
+            if POLICY.reason(url.split('v=')[1],automatic=False):raise ValueError('Bài này đang bị chặn; bỏ chặn trong danh sách Không thích trước')
+            if POLICY.sleep_state()['expired']:
+                VOLUME=POLICY.sleep['volume'];POLICY.cancel_sleep()
+                MANUAL_PAUSE=False
+                save_nonstop()
+            play(url);LAST_URL=url;MANUAL_PAUSE=False
+            if NONSTOP:save_nonstop()
+    elif action=='clear':QUEUE.clear()
+    elif action=='remove':
+        index=d.get('index')
+        if type(index)!=int or not 0<=index<len(QUEUE):raise ValueError('Mục hàng đợi không hợp lệ')
+        QUEUE.pop(index)
+    elif action=='next':
+        move_next(status())
+        if NONSTOP:save_nonstop()
+    elif action in ('toggle','seek','volume'):
+        if action=='toggle':
+            if POLICY.sleep_state()['expired']:
+                VOLUME=POLICY.sleep['volume']
+                POLICY.cancel_sleep();MANUAL_PAUSE=False;save_nonstop()
+                level=limited_volume(VOLUME);install_volume_hook(level)
+                cmd=f'window.__piMediaVolume={level}/100;v.volume={level}/100;await v.play()'
+            else:
+                MANUAL_PAUSE=not status().get('paused',True)
+                cmd='if(v.paused){await v.play()}else{v.pause()}'
+            if NONSTOP:save_nonstop()
+        else:
+            n=d.get('value')
+            if type(n) not in (int,float) or not math.isfinite(n):raise ValueError('Giá trị không hợp lệ')
+            if action=='seek':
+                if n not in (-10,10):raise ValueError('Chỉ tua ±10 giây')
+                cmd=f'v.currentTime=Math.max(0,Math.min(Number.isFinite(v.duration)?v.duration:1e12,v.currentTime+({n})))'
+            else:
+                if not 0<=n<=100:raise ValueError('Âm lượng phải từ 0 đến 100')
+                n=limited_volume(n)
+                cmd=f'window.__piMediaVolume={n}/100;v.volume={n}/100;v.muted=false'
+        evaluate('(async()=>{const v=document.querySelector("video");if(!v)throw Error("No video");'+cmd+';return true})()')
+        if action=='volume':
+            VOLUME=n
+            install_volume_hook(n)
+            if NONSTOP:save_nonstop()
+    else:raise ValueError('Thao tác không được hỗ trợ')
+    ERROR=''
+    return status()
+
+NONSTOP_JS="""(()=>{
+const b=document.querySelector('.ytp-autonav-toggle-button');
+if(b&&b.getAttribute('aria-checked')!=='true')b.click();
+for(const dialog of document.querySelectorAll('yt-confirm-dialog-renderer,ytd-confirm-dialog-renderer')){
+ const text=(dialog.textContent||'').toLowerCase();
+ if(!/continue watching|video paused|tiếp tục xem|video.*tạm dừng/.test(text))continue;
+ if(/sign in|đăng nhập|password|mật khẩu/.test(text))continue;
+ const yes=[...dialog.querySelectorAll('button')].find(x=>x.offsetParent!==null&&/^(yes|continue|ok|có|tiếp tục)$/i.test(x.textContent.trim()));
+ if(yes)yes.click();
+}
+const v=document.querySelector('video');if(v&&v.paused&&!v.ended)v.play().catch(()=>{});
+return true;
+})()"""
+
+def nonstop_tick(s,now=None):
+    global LAST_URL,LAST_PROGRESS,PROGRESS_AT,RECOVERY_AT,RECOVERY_COUNT,NONSTOP_NOTE
+    if STANDBY:return
+    now=time.monotonic() if now is None else now
+    if POLICY.sleep_state()['expired']:NONSTOP_NOTE='Hết hẹn giờ ngủ; bấm Phát để nghe tiếp';return
+    if not NONSTOP:return
+    if MANUAL_PAUSE:NONSTOP_NOTE='Bạn đã tạm dừng; bấm Phát để tiếp tục';return
+    if s.get('url'):LAST_URL=s['url']
+    progress=(s.get('url'),round(s.get('position',0)))
+    if s.get('has_video') and progress!=LAST_PROGRESS:
+        LAST_PROGRESS=progress;PROGRESS_AT=now;RECOVERY_COUNT=0
+    if now<RECOVERY_AT:return
+    if s.get('connected') and s.get('has_video'):
+        evaluate(NONSTOP_JS)
+        NONSTOP_NOTE='Đang giữ Autoplay và tiếp tục phát'
+        if s.get('ad'):return
+        if s.get('ended'):
+            if QUEUE:return
+            move_next(s);RECOVERY_AT=now+20
+            return
+        if not s.get('notice') and (not PROGRESS_AT or now-PROGRESS_AT<180):return
+    if not LAST_URL:NONSTOP_NOTE='Chọn một video đầu tiên để Nonstop tiếp tục';return
+    RECOVERY_COUNT+=1
+    RECOVERY_AT=now+min(900,60*2**min(RECOVERY_COUNT-1,4))
+    NONSTOP_NOTE=f'Đang thử phục hồi · chờ {int(RECOVERY_AT-now)} giây trước lần tiếp'
+    if POLICY.reason(LAST_URL.split('v=')[1],automatic=False):
+        if s.get('up_next'):move_next(s)
+        else:NONSTOP_NOTE='Bài phục hồi nằm trong danh sách không thích; chọn bài khác'
+        return
+    open_browser();play(youtube_url(LAST_URL));PROGRESS_AT=now
+
+def advance_loop():
+    global ERROR,END_LATCH
+    while True:
+        time.sleep(3)
+        with LOCK:
+            if STANDBY:continue
+            if not QUEUE and not NONSTOP and not VOLUME_SCHEDULE['enabled'] and not POLICY.sleep and not POLICY.repeat['enabled'] and not POLICY.disliked:continue
+            try:
+                resume_tick()
+                s=status()
+                if s.get('connected'):ERROR=''
+                volume_tick(s)
+                if sleep_tick(s):continue
+                if preference_tick(s):continue
+                nonstop_tick(s)
+                if QUEUE and s.get('connected') and s.get('ended') and not s.get('ad') and not END_LATCH and not MANUAL_PAUSE:
+                    END_LATCH=True
+                    move_next(s)
+            except Exception:ERROR=('Nonstop đang chờ thử lại; nếu có hộp thoại đăng nhập/keyring, xử lý trên Pi.' if NONSTOP else 'Chưa chuyển được bài tiếp theo; dùng nút Bài tiếp hoặc kiểm tra desktop.')
+
+class Handler(socketserver.StreamRequestHandler):
+    def handle(self):
+        self.connection.settimeout(12)
+        try:
+            raw=self.rfile.readline(4097)
+            if len(raw)>4096:raise ValueError('Yêu cầu quá dài')
+            data=json.loads(raw)
+            if not isinstance(data,dict):raise ValueError('Yêu cầu không hợp lệ')
+            with LOCK:result=dispatch(data)
+            response={'ok':True,'data':result}
+        except Exception as exc:response={'ok':False,'error':str(exc)[:200]}
+        self.wfile.write(json.dumps(response).encode()+b'\n')
+
+def main():
+    load_nonstop()
+    path=Path(f'/run/user/{os.getuid()}/pi-media.sock')
+    path.unlink(missing_ok=True)
+    with socketserver.UnixStreamServer(str(path),Handler) as server:
+        path.chmod(0o600)
+        threading.Thread(target=advance_loop,daemon=True).start()
+        server.serve_forever()
+
+if __name__=='__main__':main()

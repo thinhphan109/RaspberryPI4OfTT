@@ -1,0 +1,92 @@
+#!/bin/bash
+
+IFACE="wlan0"
+HOTSPOT="Pi-Fallback"
+PREFERRED="netplan-wlan0-Hoang Phuc 5G"
+STATE="/run/wifi-fallback-empty-count"
+
+log_msg() {
+    echo "[wifi-fallback] $*"
+    logger -t wifi-fallback "$*"
+}
+
+ACTIVE="$(nmcli -g GENERAL.CONNECTION device show "$IFACE" 2>/dev/null | head -n1)"
+
+# Đang dùng Wi-Fi nhà -> không làm gì
+if [ "$ACTIVE" = "$PREFERRED" ]; then
+    echo 0 > "$STATE"
+    exit 0
+fi
+
+# Nếu đang kết nối một Wi-Fi khác -> giữ nguyên
+if [ -n "$ACTIVE" ] && [ "$ACTIVE" != "--" ] && [ "$ACTIVE" != "$HOTSPOT" ]; then
+    echo 0 > "$STATE"
+    log_msg "Dang dung mang khac: $ACTIVE - giu nguyen."
+    exit 0
+fi
+
+# Nếu đang phát Hotspot
+if [ "$ACTIVE" = "$HOTSPOT" ]; then
+
+    IW_CLIENTS="$(iw dev "$IFACE" station dump 2>/dev/null | grep -c '^Station ' || true)"
+    TCP_CLIENTS="$(ss -Htn state established 2>/dev/null | grep -c '192\.168\.50\.' || true)"
+
+    # Có laptop/điện thoại/SSH/VNC đang sử dụng -> tuyệt đối không chuyển
+    if [ "$IW_CLIENTS" -gt 0 ] || [ "$TCP_CLIENTS" -gt 0 ]; then
+        echo 0 > "$STATE"
+        log_msg "Hotspot dang co client. Giu RaspPI4OfTT."
+        exit 0
+    fi
+
+    # Chờ 2 lần kiểm tra liên tiếp không có client
+    COUNT=0
+    [ -f "$STATE" ] && COUNT="$(cat "$STATE" 2>/dev/null)"
+
+    case "$COUNT" in
+        ''|*[!0-9]*) COUNT=0 ;;
+    esac
+
+    COUNT=$((COUNT + 1))
+    echo "$COUNT" > "$STATE"
+
+    if [ "$COUNT" -lt 2 ]; then
+        log_msg "Hotspot khong co client. Cho them mot lan kiem tra."
+        exit 0
+    fi
+
+    HOME_SSID="$(nmcli -g 802-11-wireless.ssid connection show "$PREFERRED" 2>/dev/null)"
+
+    if [ -z "$HOME_SSID" ]; then
+        exit 0
+    fi
+
+    TMP_SCAN="/run/wifi-fallback-scan"
+
+    # Chỉ chuyển khi thực sự nhìn thấy Wi-Fi nhà.
+    # Nếu driver không cho scan khi đang AP -> giữ nguyên Hotspot.
+    if iw dev "$IFACE" scan > "$TMP_SCAN" 2>/dev/null; then
+        if grep -Fq "SSID: $HOME_SSID" "$TMP_SCAN"; then
+            log_msg "Tim thay $HOME_SSID va khong co client. Chuyen ve Wi-Fi."
+
+            if nmcli connection up "$PREFERRED" ifname "$IFACE"; then
+                echo 0 > "$STATE"
+                rm -f "$TMP_SCAN"
+                exit 0
+            else
+                log_msg "Chuyen Wi-Fi that bai. Khoi phuc Hotspot."
+                nmcli connection up "$HOTSPOT" ifname "$IFACE" >/dev/null 2>&1 || true
+            fi
+        fi
+    fi
+
+    rm -f "$TMP_SCAN"
+    exit 0
+fi
+
+# wlan0 không có kết nối nào -> thử Wi-Fi nhà trước, thất bại thì bật Hotspot
+log_msg "wlan0 khong co ket noi. Thu Wi-Fi uu tien."
+
+if ! nmcli connection up "$PREFERRED" ifname "$IFACE"; then
+    log_msg "Khong vao duoc Wi-Fi uu tien. Bat RaspPI4OfTT."
+    nmcli connection up "$HOTSPOT" ifname "$IFACE"
+fi

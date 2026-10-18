@@ -1,0 +1,442 @@
+#!/usr/bin/env python3
+
+import sys
+import json
+import subprocess
+
+NMCLI = "/usr/bin/nmcli"
+IFACE = "wlan0"
+FALLBACK = "Pi-Fallback"
+
+
+def command(args):
+    p = subprocess.run(
+        args,
+        text=True,
+        capture_output=True
+    )
+
+    if p.returncode != 0:
+        raise RuntimeError(
+            p.stderr.strip() or
+            p.stdout.strip() or
+            "Command failed"
+        )
+
+    return p.stdout.strip()
+
+
+def nm(*args):
+    return command([NMCLI, *args])
+
+
+def split_nmcli(line):
+    parts = []
+    buf = ""
+    escaped = False
+
+    for ch in line:
+        if escaped:
+            buf += ch
+            escaped = False
+        elif ch == "\\":
+            escaped = True
+        elif ch == ":":
+            parts.append(buf)
+            buf = ""
+        else:
+            buf += ch
+
+    parts.append(buf)
+    return parts
+
+
+def get_active():
+    try:
+        return nm(
+            "-g",
+            "GENERAL.CONNECTION",
+            "device",
+            "show",
+            IFACE
+        ).strip()
+    except Exception:
+        return ""
+
+
+def get_signal():
+    try:
+        raw = nm(
+            "-t",
+            "-f",
+            "IN-USE,SSID,SIGNAL",
+            "device",
+            "wifi",
+            "list",
+            "ifname",
+            IFACE,
+            "--rescan",
+            "no"
+        )
+
+        for line in raw.splitlines():
+            parts = split_nmcli(line)
+
+            if len(parts) >= 3 and parts[0] == "*":
+                return {
+                    "ssid": parts[1],
+                    "signal": int(parts[2])
+                }
+
+    except Exception:
+        pass
+
+    return {
+        "ssid": "",
+        "signal": 0
+    }
+
+
+def get_profiles():
+    result = []
+
+    raw = nm(
+        "-t",
+        "-f",
+        "NAME,TYPE,AUTOCONNECT,AUTOCONNECT-PRIORITY",
+        "connection",
+        "show"
+    )
+
+    for line in raw.splitlines():
+        parts = split_nmcli(line)
+
+        if len(parts) < 4:
+            continue
+
+        name = parts[0]
+        typ = parts[1]
+        auto = parts[2]
+
+        try:
+            priority = int(parts[3])
+        except Exception:
+            priority = 0
+
+        if typ not in ("wifi", "802-11-wireless"):
+            continue
+
+        try:
+            ssid = nm(
+                "-g",
+                "802-11-wireless.ssid",
+                "connection",
+                "show",
+                name
+            )
+        except Exception:
+            ssid = ""
+
+        result.append({
+            "name": name,
+            "ssid": ssid,
+            "autoconnect": auto == "yes",
+            "priority": priority,
+            "fallback": name == FALLBACK
+        })
+
+    result.sort(
+        key=lambda x: x["priority"],
+        reverse=True
+    )
+
+    return result
+
+
+def scan_wifi():
+    raw = nm(
+        "-t",
+        "-f",
+        "SSID,SIGNAL,SECURITY",
+        "device",
+        "wifi",
+        "list",
+        "ifname",
+        IFACE,
+        "--rescan",
+        "yes"
+    )
+
+    networks = {}
+
+    for line in raw.splitlines():
+        parts = split_nmcli(line)
+
+        if len(parts) < 3:
+            continue
+
+        ssid = parts[0].strip()
+
+        if not ssid:
+            continue
+
+        try:
+            signal = int(parts[1])
+        except Exception:
+            signal = 0
+
+        security = parts[2] or "Open"
+
+        if (
+            ssid not in networks or
+            signal > networks[ssid]["signal"]
+        ):
+            networks[ssid] = {
+                "ssid": ssid,
+                "signal": signal,
+                "security": security
+            }
+
+    result = list(networks.values())
+
+    result.sort(
+        key=lambda x: x["signal"],
+        reverse=True
+    )
+
+    return result
+
+
+def status():
+    active = get_active()
+    sig = get_signal()
+
+    try:
+        ip = nm(
+            "-g",
+            "IP4.ADDRESS",
+            "device",
+            "show",
+            IFACE
+        ).splitlines()[0]
+    except Exception:
+        ip = ""
+
+    try:
+        gateway = nm(
+            "-g",
+            "IP4.GATEWAY",
+            "device",
+            "show",
+            IFACE
+        ).splitlines()[0]
+    except Exception:
+        gateway = ""
+
+    try:
+        dns = nm(
+            "-g",
+            "IP4.DNS",
+            "device",
+            "show",
+            IFACE
+        ).splitlines()[0]
+    except Exception:
+        dns = ""
+
+    return {
+        "active": active,
+        "ip": ip,
+        "gateway": gateway,
+        "dns": dns,
+        "signal": sig["signal"],
+        "active_ssid": sig["ssid"],
+        "profiles": get_profiles()
+    }
+
+
+def save_wifi(ssid, password, priority):
+    ssid = ssid.strip()
+    priority = int(priority)
+
+    if not ssid:
+        raise RuntimeError("SSID không được để trống")
+
+    if priority < -999 or priority > 999:
+        raise RuntimeError("Priority phải từ -999 đến 999")
+
+    if len(password) < 8 or len(password) > 63:
+        raise RuntimeError(
+            "Password WPA phải từ 8 đến 63 ký tự"
+        )
+
+    existing = None
+
+    for profile in get_profiles():
+        if (
+            profile["ssid"] == ssid and
+            not profile["fallback"]
+        ):
+            existing = profile["name"]
+            break
+
+    if existing:
+        name = existing
+
+    else:
+        name = "WiFi-" + ssid
+
+        nm(
+            "connection",
+            "add",
+            "type",
+            "wifi",
+            "ifname",
+            IFACE,
+            "con-name",
+            name,
+            "ssid",
+            ssid
+        )
+
+    nm(
+        "connection",
+        "modify",
+        name,
+        "wifi-sec.key-mgmt",
+        "wpa-psk",
+        "wifi-sec.psk",
+        password,
+        "connection.autoconnect",
+        "yes",
+        "connection.autoconnect-priority",
+        str(priority)
+    )
+
+    return name
+
+
+def connect_profile(name):
+    nm(
+        "connection",
+        "up",
+        name,
+        "ifname",
+        IFACE
+    )
+
+
+def delete_profile(name):
+    if name == FALLBACK:
+        raise RuntimeError(
+            "Không được xóa Pi-Fallback"
+        )
+
+    if name == get_active():
+        raise RuntimeError(
+            "Không thể xóa mạng đang sử dụng"
+        )
+
+    nm(
+        "connection",
+        "delete",
+        name
+    )
+
+
+def set_priority(name, priority):
+    if name == FALLBACK:
+        raise RuntimeError(
+            "Không thay priority fallback tại đây"
+        )
+
+    priority = int(priority)
+
+    if priority < -999 or priority > 999:
+        raise RuntimeError(
+            "Priority không hợp lệ"
+        )
+
+    nm(
+        "connection",
+        "modify",
+        name,
+        "connection.autoconnect-priority",
+        str(priority)
+    )
+
+
+def main():
+    try:
+        if len(sys.argv) < 2:
+            raise RuntimeError("Thiếu action")
+
+        action = sys.argv[1]
+
+        if action == "status":
+            result = status()
+
+        elif action == "scan":
+            result = scan_wifi()
+
+        elif action == "save":
+            result = {
+                "profile": save_wifi(
+                    sys.argv[2],
+                    sys.argv[3],
+                    sys.argv[4]
+                )
+            }
+
+        elif action == "connect":
+            connect_profile(sys.argv[2])
+
+            result = {
+                "connected": sys.argv[2]
+            }
+
+        elif action == "delete":
+            delete_profile(sys.argv[2])
+
+            result = {
+                "deleted": sys.argv[2]
+            }
+
+        elif action == "priority":
+            set_priority(
+                sys.argv[2],
+                sys.argv[3]
+            )
+
+            result = {
+                "updated": sys.argv[2]
+            }
+
+        elif action == "hotspot":
+            connect_profile(FALLBACK)
+
+            result = {
+                "hotspot": True
+            }
+
+        else:
+            raise RuntimeError(
+                "Action không hợp lệ"
+            )
+
+        print(json.dumps({
+            "ok": True,
+            "data": result
+        }))
+
+    except Exception as e:
+        print(json.dumps({
+            "ok": False,
+            "error": str(e)
+        }))
+
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

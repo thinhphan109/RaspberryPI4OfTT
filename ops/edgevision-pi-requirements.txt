@@ -1,0 +1,4 @@
+# Match EdgeVisionRobot/pyproject.toml; no YOLO dependencies at this stage.
+numpy>=1.26,<3
+opencv-python-headless>=4.10,<5
+pyserial>=3.5,<4

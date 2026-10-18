@@ -1,0 +1,7 @@
+[Unit]
+Description=Dedicated Pi Media Chromium window
+After=graphical-session.target
+
+[Service]
+ExecStart=/usr/lib/chromium/chromium --ozone-platform=wayland --disable-renderer-backgrounding --user-data-dir=%h/.local/share/pi-media/chromium --remote-debugging-address=127.0.0.1 --remote-debugging-port=18769 --no-first-run --no-default-browser-check --autoplay-policy=no-user-gesture-required --app=https://www.youtube.com/
+Restart=no

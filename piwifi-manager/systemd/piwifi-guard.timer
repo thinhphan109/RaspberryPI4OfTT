@@ -1,0 +1,10 @@
+[Unit]
+Description=Check disconnected Wi-Fi every 30 seconds
+
+[Timer]
+OnBootSec=60
+OnUnitInactiveSec=30
+Unit=piwifi-guard.service
+
+[Install]
+WantedBy=timers.target

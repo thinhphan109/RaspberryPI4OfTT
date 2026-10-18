@@ -1,0 +1,1 @@
+thinh ALL=(root) NOPASSWD: /usr/local/sbin/piwifi-helper *

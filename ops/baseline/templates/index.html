@@ -1,0 +1,2201 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+<meta charset="UTF-8">
+
+<meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+>
+
+<title>Raspberry Pi Wi-Fi Manager</title>
+
+<style>
+
+:root {
+    --bg: #f3f6fc;
+    --surface: #ffffff;
+    --surface2: #f8faff;
+    --border: #e5eaf3;
+
+    --text: #111827;
+    --muted: #718096;
+
+    --blue: #4254f5;
+    --blue2: #635bff;
+
+    --green: #16b364;
+    --red: #ff4059;
+    --orange: #f59e0b;
+
+    --sidebar: #081525;
+    --sidebar2: #0c1b2e;
+
+    --shadow:
+        0 10px 35px
+        rgba(25, 50, 90, .07);
+
+    --radius: 18px;
+}
+
+
+body.dark {
+    --bg: #0d1420;
+    --surface: #141e2c;
+    --surface2: #192536;
+    --border: #26364a;
+
+    --text: #edf3ff;
+    --muted: #95a6bd;
+
+    --shadow:
+        0 10px 35px
+        rgba(0, 0, 0, .22);
+}
+
+
+* {
+    box-sizing: border-box;
+}
+
+
+body {
+    margin: 0;
+    font-family:
+        Inter,
+        system-ui,
+        -apple-system,
+        Segoe UI,
+        Arial,
+        sans-serif;
+
+    background: var(--bg);
+    color: var(--text);
+
+    transition:
+        background .2s,
+        color .2s;
+}
+
+
+button,
+input {
+    font: inherit;
+}
+
+
+button {
+    cursor: pointer;
+}
+
+
+.app {
+    display: grid;
+
+    grid-template-columns:
+        250px 1fr;
+
+    min-height: 100vh;
+}
+
+
+/* SIDEBAR */
+
+.sidebar {
+    position: fixed;
+
+    width: 250px;
+    height: 100vh;
+
+    padding: 24px 15px;
+
+    color: white;
+
+    background:
+        linear-gradient(
+            180deg,
+            var(--sidebar),
+            var(--sidebar2)
+        );
+
+    display: flex;
+    flex-direction: column;
+}
+
+
+.brand {
+    display: flex;
+    gap: 13px;
+    align-items: center;
+
+    padding: 4px 10px 27px;
+}
+
+
+.logo {
+    width: 46px;
+    height: 46px;
+
+    display: grid;
+    place-items: center;
+
+    font-size: 29px;
+
+    border-radius: 14px;
+
+    background:
+        linear-gradient(
+            135deg,
+            #42d66b,
+            #d42065
+        );
+}
+
+
+.brand h2 {
+    font-size: 18px;
+    margin: 0;
+}
+
+
+.brand span {
+    font-size: 13px;
+    opacity: .75;
+}
+
+
+.nav {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+
+.nav a {
+    color: #d8e2ef;
+
+    text-decoration: none;
+
+    padding: 13px 15px;
+
+    border-radius: 11px;
+
+    font-size: 14px;
+}
+
+
+.nav a:hover {
+    background: rgba(255,255,255,.08);
+}
+
+
+.nav a.active {
+    background:
+        linear-gradient(
+            135deg,
+            #2658dc,
+            #313fb3
+        );
+
+    color: white;
+}
+
+
+.pi-info {
+    margin-top: auto;
+
+    padding:
+        20px 11px 8px;
+
+    border-top:
+        1px solid
+        rgba(255,255,255,.1);
+
+    font-size: 13px;
+
+    color: #adbbcd;
+
+    line-height: 1.8;
+}
+
+
+.online {
+    color: #39df76;
+}
+
+
+/* CONTENT */
+
+.content {
+    grid-column: 2;
+
+    padding:
+        20px 27px 40px;
+}
+
+
+.topbar {
+    display: flex;
+
+    justify-content:
+        space-between;
+
+    align-items: center;
+
+    margin-bottom: 20px;
+}
+
+
+.title h1 {
+    margin: 0;
+    font-size: 25px;
+}
+
+
+.title p {
+    color: var(--muted);
+
+    margin:
+        5px 0 0;
+
+    font-size: 14px;
+}
+
+
+.top-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+
+.round-btn {
+    width: 42px;
+    height: 42px;
+
+    border: 1px solid var(--border);
+
+    border-radius: 50%;
+
+    background: var(--surface);
+
+    color: var(--text);
+}
+
+
+.avatar {
+    width: 39px;
+    height: 39px;
+
+    border-radius: 50%;
+
+    display: grid;
+    place-items: center;
+
+    color: white;
+
+    background:
+        linear-gradient(
+            135deg,
+            var(--blue),
+            #854cff
+        );
+}
+
+
+.logout {
+    color: var(--muted);
+    text-decoration: none;
+
+    font-size: 14px;
+}
+
+
+/* GRID */
+
+.top-grid {
+    display: grid;
+
+    grid-template-columns:
+        1.1fr 1.05fr 1.05fr;
+
+    gap: 16px;
+}
+
+
+.main-grid {
+    display: grid;
+
+    grid-template-columns:
+        1.7fr .9fr;
+
+    gap: 16px;
+
+    margin-top: 16px;
+}
+
+
+.card {
+    background: var(--surface);
+
+    border:
+        1px solid var(--border);
+
+    border-radius:
+        var(--radius);
+
+    box-shadow:
+        var(--shadow);
+
+    padding: 20px;
+}
+
+
+.card-title {
+    display: flex;
+
+    justify-content:
+        space-between;
+
+    align-items: center;
+
+    margin-bottom: 17px;
+}
+
+
+.card-title h3 {
+    margin: 0;
+
+    font-size: 17px;
+}
+
+
+.sub {
+    color: var(--muted);
+
+    font-size: 12px;
+
+    margin-top: 4px;
+}
+
+
+/* CURRENT WIFI */
+
+.current-name {
+    font-size: 22px;
+    font-weight: 750;
+
+    margin-bottom: 17px;
+}
+
+
+.status-green {
+    color: var(--green);
+
+    font-size: 13px;
+
+    margin-bottom: 6px;
+}
+
+
+.info-row {
+    display: flex;
+
+    justify-content:
+        space-between;
+
+    padding: 7px 0;
+
+    color: var(--muted);
+
+    font-size: 13px;
+}
+
+
+.info-row strong {
+    color: var(--text);
+}
+
+
+.signal {
+    color: var(--green) !important;
+}
+
+
+/* STATUS BOX */
+
+.status-grid {
+    display: grid;
+
+    grid-template-columns:
+        1fr 1fr;
+
+    gap: 10px;
+}
+
+
+.status-box {
+    padding: 14px;
+
+    border:
+        1px solid var(--border);
+
+    border-radius: 13px;
+
+    background: var(--surface2);
+}
+
+
+.status-box span {
+    color: var(--muted);
+
+    font-size: 12px;
+}
+
+
+.status-box strong {
+    display: block;
+
+    margin-top: 7px;
+
+    font-size: 14px;
+}
+
+
+.good {
+    color: var(--green);
+}
+
+
+/* BUTTONS */
+
+.btn {
+    border: 0;
+
+    padding:
+        10px 14px;
+
+    border-radius:
+        10px;
+
+    font-weight: 600;
+
+    font-size: 13px;
+}
+
+
+.btn-primary {
+    color: white;
+
+    background:
+        linear-gradient(
+            135deg,
+            var(--blue),
+            var(--blue2)
+        );
+}
+
+
+.btn-danger {
+    color: var(--red);
+
+    background:
+        #fff1f3;
+
+    border:
+        1px solid #ffd1d8;
+}
+
+
+.btn-outline {
+    color: var(--blue);
+
+    background:
+        transparent;
+
+    border:
+        1px solid #aab5ff;
+}
+
+
+.btn-hotspot {
+    width: 100%;
+
+    color: white;
+
+    margin-top: 13px;
+
+    background:
+        linear-gradient(
+            135deg,
+            #ff384f,
+            #ff5265
+        );
+}
+
+
+/* HOTSPOT */
+
+.hotspot-box {
+    padding: 15px;
+
+    border-radius: 13px;
+
+    background:
+        linear-gradient(
+            135deg,
+            #fff5f6,
+            #fff
+        );
+
+    border:
+        1px solid #ffe1e5;
+}
+
+
+body.dark .hotspot-box {
+    background:
+        linear-gradient(
+            135deg,
+            #271c25,
+            #17202e
+        );
+
+    border-color: #462c36;
+}
+
+
+.hotspot-name {
+    font-weight: 750;
+    font-size: 17px;
+}
+
+
+/* TABLE */
+
+.table-wrap {
+    overflow-x: auto;
+}
+
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+
+th {
+    color: var(--muted);
+
+    font-size: 12px;
+
+    font-weight: 600;
+
+    text-align: left;
+
+    padding: 10px;
+}
+
+
+td {
+    padding: 11px 10px;
+
+    border-top:
+        1px solid var(--border);
+
+    font-size: 13px;
+}
+
+
+.badge {
+    display: inline-block;
+
+    padding:
+        4px 8px;
+
+    border-radius: 20px;
+
+    font-size: 11px;
+
+    background: #eef2ff;
+
+    color: var(--blue);
+}
+
+
+.badge-green {
+    background: #e8faef;
+    color: #09964a;
+}
+
+
+.badge-red {
+    background: #fff0f2;
+    color: #ec334d;
+}
+
+
+.priority {
+    width: 65px;
+
+    padding: 7px;
+
+    border:
+        1px solid var(--border);
+
+    border-radius: 8px;
+
+    background:
+        var(--surface2);
+
+    color:
+        var(--text);
+}
+
+
+.actions {
+    display: flex;
+    gap: 6px;
+}
+
+
+/* SCAN */
+
+.scan-list {
+    display: flex;
+
+    flex-direction: column;
+
+    min-height: 120px;
+
+    max-height: 360px;
+
+    overflow: auto;
+}
+
+
+.scan-item {
+    display: grid;
+
+    grid-template-columns:
+        1fr auto auto;
+
+    gap: 10px;
+
+    align-items: center;
+
+    padding: 11px 4px;
+
+    border-bottom:
+        1px solid var(--border);
+}
+
+
+.scan-name {
+    font-size: 13px;
+    font-weight: 600;
+}
+
+
+.scan-security {
+    color: var(--muted);
+
+    font-size: 11px;
+}
+
+
+.signal-bars {
+    color: var(--green);
+
+    font-size: 12px;
+}
+
+
+/* ADD WIFI */
+
+.add-card {
+    margin-top: 16px;
+}
+
+
+.form-grid {
+    display: grid;
+
+    grid-template-columns:
+        1.4fr 1.4fr .5fr;
+
+    gap: 10px;
+}
+
+
+.field label {
+    display: block;
+
+    color: var(--muted);
+
+    font-size: 12px;
+
+    margin-bottom: 7px;
+}
+
+
+.field input {
+    width: 100%;
+
+    padding: 11px 12px;
+
+    border:
+        1px solid var(--border);
+
+    border-radius:
+        10px;
+
+    background:
+        var(--surface2);
+
+    color:
+        var(--text);
+
+    outline: none;
+}
+
+
+.field input:focus {
+    border-color:
+        var(--blue);
+}
+
+
+.form-actions {
+    display: grid;
+
+    grid-template-columns:
+        1fr 1fr;
+
+    gap: 10px;
+
+    margin-top: 14px;
+}
+
+
+/* FLASH */
+
+.flash {
+    padding: 12px 15px;
+
+    margin-bottom: 15px;
+
+    border-radius: 11px;
+
+    font-size: 13px;
+}
+
+
+.flash.success {
+    color: #08773d;
+    background: #e9faef;
+}
+
+
+.flash.error {
+    color: #a51227;
+    background: #fff0f2;
+}
+
+
+/* LOGIN */
+
+.login-page {
+    min-height: 100vh;
+
+    display: grid;
+    place-items: center;
+
+    background:
+        radial-gradient(
+            circle at top left,
+            #dfe7ff,
+            #f6f8fc 55%
+        );
+}
+
+
+.login-card {
+    width: min(
+        420px,
+        calc(100% - 30px)
+    );
+
+    background: white;
+
+    padding: 35px;
+
+    border-radius: 22px;
+
+    box-shadow:
+        0 25px 70px
+        rgba(35,55,100,.18);
+}
+
+
+.login-logo {
+    width: 60px;
+    height: 60px;
+
+    display: grid;
+    place-items: center;
+
+    margin-bottom: 20px;
+
+    font-size: 34px;
+
+    border-radius: 18px;
+
+    background:
+        linear-gradient(
+            135deg,
+            #5adb65,
+            #d51e67
+        );
+}
+
+
+.login-card h1 {
+    margin: 0 0 7px;
+}
+
+
+.login-card p {
+    color: #768397;
+
+    margin-bottom: 25px;
+}
+
+
+.login-card input {
+    width: 100%;
+
+    padding: 13px;
+
+    margin-bottom: 12px;
+
+    border:
+        1px solid #dfe5ef;
+
+    border-radius: 11px;
+}
+
+
+.login-card button {
+    width: 100%;
+
+    padding: 13px;
+
+    border: 0;
+
+    border-radius: 11px;
+
+    color: white;
+
+    background:
+        linear-gradient(
+            135deg,
+            #4054f5,
+            #6b55ff
+        );
+}
+
+
+/* SWITCHING */
+
+.switching {
+    min-height: 100vh;
+
+    display: grid;
+    place-items: center;
+
+    background: var(--bg);
+}
+
+
+.switch-card {
+    width: min(
+        500px,
+        calc(100% - 30px)
+    );
+
+    padding: 35px;
+
+    text-align: center;
+
+    background: var(--surface);
+
+    border-radius: 20px;
+
+    box-shadow: var(--shadow);
+}
+
+
+.spinner {
+    width: 55px;
+    height: 55px;
+
+    margin:
+        0 auto 20px;
+
+    border:
+        5px solid #dfe4ff;
+
+    border-top-color:
+        var(--blue);
+
+    border-radius: 50%;
+
+    animation:
+        spin 1s linear infinite;
+}
+
+
+@keyframes spin {
+    to {
+        transform:
+            rotate(360deg);
+    }
+}
+
+
+/* RESPONSIVE */
+
+@media (
+    max-width: 1100px
+) {
+
+    .top-grid {
+        grid-template-columns:
+            1fr 1fr;
+    }
+
+    .top-grid .card:last-child {
+        grid-column:
+            1 / -1;
+    }
+
+}
+
+
+@media (
+    max-width: 850px
+) {
+
+    .app {
+        display: block;
+    }
+
+    .sidebar {
+        display: none;
+    }
+
+    .content {
+        padding: 16px;
+    }
+
+    .top-grid,
+    .main-grid {
+        grid-template-columns:
+            1fr;
+    }
+
+    .form-grid {
+        grid-template-columns:
+            1fr;
+    }
+
+}
+
+</style>
+</head>
+
+
+<body>
+
+
+{% if login_mode %}
+
+<div class="login-page">
+
+<div class="login-card">
+
+<div class="login-logo">
+🍓
+</div>
+
+<h1>Raspberry Pi</h1>
+
+<p>
+Wi-Fi Manager
+</p>
+
+
+{% if error %}
+
+<div class="flash error">
+{{ error }}
+</div>
+
+{% endif %}
+
+
+<form method="post">
+
+<input
+    name="username"
+    placeholder="Username"
+    autocomplete="username"
+    required
+>
+
+<input
+    type="password"
+    name="password"
+    placeholder="Password"
+    autocomplete="current-password"
+    required
+>
+
+<button type="submit">
+Đăng nhập
+</button>
+
+</form>
+
+</div>
+
+</div>
+
+
+{% elif switching %}
+
+<div class="switching">
+
+<div class="switch-card">
+
+<div class="spinner"></div>
+
+<h2>
+Đang chuyển mạng
+</h2>
+
+<p>
+Raspberry Pi đang chuyển sang
+<strong>
+{{ switching_ssid }}
+</strong>.
+</p>
+
+{% if hotspot_switch %}
+
+<p>
+Kết nối laptop vào:
+</p>
+
+<h3>
+RaspPI4OfTT
+</h3>
+
+<p>
+Sau đó mở:
+</p>
+
+<h3>
+http://192.168.50.1:18765
+</h3>
+
+{% else %}
+
+<p>
+Kết nối laptop vào cùng Wi-Fi mới,
+sau đó truy cập lại:
+</p>
+
+<h3>
+http://raspberrypi.local:18765
+</h3>
+
+{% endif %}
+
+</div>
+
+</div>
+
+
+{% else %}
+
+
+<div class="app">
+
+
+<aside class="sidebar">
+
+<div class="brand">
+
+<div class="logo">
+🍓
+</div>
+
+<div>
+
+<h2>
+Raspberry Pi
+</h2>
+
+<span>
+Wi-Fi Manager
+</span>
+
+</div>
+
+</div>
+
+
+<nav class="nav">
+
+<a
+    href="#dashboard"
+    class="active"
+>
+⌂ &nbsp; Dashboard
+</a>
+
+<a href="#saved">
+⌁ &nbsp; Saved Networks
+</a>
+
+<a href="#scan">
+⌕ &nbsp; Scan Networks
+</a>
+
+<a href="#add">
+＋ &nbsp; Add Network
+</a>
+
+<a href="#fallback">
+◉ &nbsp; Fallback Hotspot
+</a>
+
+</nav>
+
+
+<div class="pi-info">
+
+<div>
+<span class="online">
+●
+</span>
+
+&nbsp;
+Raspberry Pi 4
+</div>
+
+<div>
+Online
+</div>
+
+<div>
+IP:
+{{ data.ip }}
+</div>
+
+<div>
+Hostname:
+{{ hostname }}
+</div>
+
+<div>
+OS:
+Debian 13
+</div>
+
+</div>
+
+</aside>
+
+
+
+<main class="content">
+
+
+<div class="topbar">
+
+<div class="title">
+
+<h1>
+Dashboard
+</h1>
+
+<p>
+Quản lý kết nối Wi-Fi cho Raspberry Pi
+</p>
+
+</div>
+
+
+<div class="top-actions">
+
+<button
+    class="round-btn"
+    onclick="toggleTheme()"
+    title="Dark / Light"
+>
+☀
+</button>
+
+<div class="avatar">
+A
+</div>
+
+<a
+    class="logout"
+    href="/logout"
+>
+admin ↗
+</a>
+
+</div>
+
+</div>
+
+
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+
+{% for category, message in messages %}
+
+<div class="flash {{ category }}">
+{{ message }}
+</div>
+
+{% endfor %}
+
+{% endwith %}
+
+
+{% if error %}
+
+<div class="flash error">
+{{ error }}
+</div>
+
+{% endif %}
+
+
+
+<section
+    id="dashboard"
+    class="top-grid"
+>
+
+
+<div class="card">
+
+<div class="status-green">
+● Đang kết nối
+</div>
+
+<div class="current-name">
+{{ data.active_ssid or data.active }}
+</div>
+
+
+<div class="info-row">
+
+<span>
+Địa chỉ IP
+</span>
+
+<strong>
+{{ data.ip or "-" }}
+</strong>
+
+</div>
+
+
+<div class="info-row">
+
+<span>
+Gateway
+</span>
+
+<strong>
+{{ data.gateway or "-" }}
+</strong>
+
+</div>
+
+
+<div class="info-row">
+
+<span>
+DNS
+</span>
+
+<strong>
+{{ data.dns or "-" }}
+</strong>
+
+</div>
+
+
+<div class="info-row">
+
+<span>
+Tín hiệu
+</span>
+
+<strong class="signal">
+{{ data.signal }}%
+</strong>
+
+</div>
+
+</div>
+
+
+
+<div class="card">
+
+<div class="card-title">
+
+<div>
+
+<h3>
+Trạng thái mạng
+</h3>
+
+<div class="sub">
+Tổng quan trạng thái hệ thống
+</div>
+
+</div>
+
+</div>
+
+
+<div class="status-grid">
+
+<div class="status-box">
+
+<span>
+Wi-Fi
+</span>
+
+<strong class="good">
+● Đã kết nối
+</strong>
+
+</div>
+
+
+<div class="status-box">
+
+<span>
+Interface
+</span>
+
+<strong>
+wlan0
+</strong>
+
+</div>
+
+
+<div class="status-box">
+
+<span>
+Hostname
+</span>
+
+<strong>
+{{ hostname }}
+</strong>
+
+</div>
+
+
+<div class="status-box">
+
+<span>
+Tín hiệu
+</span>
+
+<strong>
+{{ data.signal }}%
+</strong>
+
+</div>
+
+</div>
+
+
+<button
+    class="btn btn-primary"
+    style="
+        width:100%;
+        margin-top:12px
+    "
+    onclick="location.reload()"
+>
+↻ Làm mới
+</button>
+
+</div>
+
+
+
+<div
+    class="card"
+    id="fallback"
+>
+
+<div class="card-title">
+
+<div>
+
+<h3>
+Fallback Hotspot
+</h3>
+
+<div class="sub">
+Mạng dự phòng luôn sẵn sàng
+</div>
+
+</div>
+
+<span class="badge badge-green">
+Enabled
+</span>
+
+</div>
+
+
+<div class="hotspot-box">
+
+<div class="hotspot-name">
+RaspPI4OfTT
+</div>
+
+
+<div class="info-row">
+
+<span>
+Bảo mật
+</span>
+
+<strong>
+WPA2-PSK
+</strong>
+
+</div>
+
+
+<div class="info-row">
+
+<span>
+Địa chỉ IP
+</span>
+
+<strong>
+192.168.50.1
+</strong>
+
+</div>
+
+
+<div class="info-row">
+
+<span>
+Ưu tiên
+</span>
+
+<strong>
+-50
+</strong>
+
+</div>
+
+
+<form
+    method="post"
+    action="/hotspot"
+>
+
+<input
+    type="hidden"
+    name="csrf"
+    value="{{ csrf }}"
+>
+
+<button
+    class="btn btn-hotspot"
+    type="submit"
+    onclick="
+        return confirm(
+            'Chuyển Raspberry Pi sang Hotspot RaspPI4OfTT? Kết nối hiện tại sẽ bị ngắt.'
+        )
+    "
+>
+◉ Chuyển sang Hotspot
+</button>
+
+</form>
+
+</div>
+
+</div>
+
+
+</section>
+
+
+
+<section class="main-grid">
+
+
+<div
+    class="card"
+    id="saved"
+>
+
+<div class="card-title">
+
+<div>
+
+<h3>
+Mạng Wi-Fi đã lưu
+</h3>
+
+<div class="sub">
+Các mạng đã được cấu hình trên Raspberry Pi
+</div>
+
+</div>
+
+</div>
+
+
+<div class="table-wrap">
+
+<table>
+
+<thead>
+
+<tr>
+
+<th>
+SSID
+</th>
+
+<th>
+Ưu tiên
+</th>
+
+<th>
+Tự động
+</th>
+
+<th>
+Trạng thái
+</th>
+
+<th>
+Thao tác
+</th>
+
+</tr>
+
+</thead>
+
+
+<tbody>
+
+
+{% for p in data.profiles %}
+
+<tr>
+
+<td>
+
+<strong>
+{{ p.ssid }}
+</strong>
+
+{% if p.fallback %}
+
+<span class="badge">
+Fallback
+</span>
+
+{% endif %}
+
+</td>
+
+
+<td>
+
+{% if p.fallback %}
+
+<span class="badge badge-red">
+{{ p.priority }}
+</span>
+
+{% else %}
+
+<form
+    method="post"
+    action="/wifi/priority"
+    style="display:flex;gap:5px"
+>
+
+<input
+    type="hidden"
+    name="csrf"
+    value="{{ csrf }}"
+>
+
+<input
+    type="hidden"
+    name="name"
+    value="{{ p.name }}"
+>
+
+<input
+    class="priority"
+    type="number"
+    name="priority"
+    value="{{ p.priority }}"
+>
+
+<button
+    class="btn btn-outline"
+>
+✓
+</button>
+
+</form>
+
+{% endif %}
+
+</td>
+
+
+<td>
+
+{% if p.autoconnect %}
+
+<span class="badge badge-green">
+ON
+</span>
+
+{% else %}
+
+<span class="badge">
+OFF
+</span>
+
+{% endif %}
+
+</td>
+
+
+<td>
+
+{% if p.name == data.active %}
+
+<span class="badge badge-green">
+Đang sử dụng
+</span>
+
+{% else %}
+
+<span class="badge">
+Đã lưu
+</span>
+
+{% endif %}
+
+</td>
+
+
+<td>
+
+<div class="actions">
+
+
+{% if not p.fallback %}
+
+<form
+    method="post"
+    action="/wifi/connect"
+>
+
+<input
+    type="hidden"
+    name="csrf"
+    value="{{ csrf }}"
+>
+
+<input
+    type="hidden"
+    name="name"
+    value="{{ p.name }}"
+>
+
+<input
+    type="hidden"
+    name="ssid"
+    value="{{ p.ssid }}"
+>
+
+<button
+    class="btn btn-primary"
+    type="submit"
+    {% if p.name == data.active %}
+    disabled
+    {% endif %}
+>
+Kết nối
+</button>
+
+</form>
+
+
+{% if p.name != data.active %}
+
+<form
+    method="post"
+    action="/wifi/delete"
+>
+
+<input
+    type="hidden"
+    name="csrf"
+    value="{{ csrf }}"
+>
+
+<input
+    type="hidden"
+    name="name"
+    value="{{ p.name }}"
+>
+
+<button
+    class="btn btn-danger"
+    onclick="
+        return confirm(
+            'Xóa mạng {{ p.ssid }}?'
+        )
+    "
+>
+Xóa
+</button>
+
+</form>
+
+{% endif %}
+
+{% endif %}
+
+
+</div>
+
+</td>
+
+</tr>
+
+{% endfor %}
+
+
+</tbody>
+
+</table>
+
+</div>
+
+</div>
+
+
+
+<div
+    class="card"
+    id="scan"
+>
+
+<div class="card-title">
+
+<div>
+
+<h3>
+Quét mạng Wi-Fi
+</h3>
+
+<div class="sub">
+Các mạng đang ở xung quanh
+</div>
+
+</div>
+
+
+<button
+    class="btn btn-outline"
+    onclick="scanWifi()"
+>
+↻ Quét
+</button>
+
+</div>
+
+
+<div
+    id="scan-list"
+    class="scan-list"
+>
+
+<div class="sub">
+Nhấn “Quét” để tìm mạng Wi-Fi.
+</div>
+
+</div>
+
+</div>
+
+
+</section>
+
+
+
+<section
+    class="card add-card"
+    id="add"
+>
+
+<div class="card-title">
+
+<div>
+
+<h3>
+Thêm mạng Wi-Fi mới
+</h3>
+
+<div class="sub">
+Lưu Wi-Fi vào NetworkManager
+</div>
+
+</div>
+
+</div>
+
+
+<form
+    method="post"
+    action="/wifi/save"
+>
+
+<input
+    type="hidden"
+    name="csrf"
+    value="{{ csrf }}"
+>
+
+
+<div class="form-grid">
+
+
+<div class="field">
+
+<label>
+SSID
+</label>
+
+<input
+    id="ssid-input"
+    name="ssid"
+    placeholder="Tên mạng Wi-Fi"
+    required
+>
+
+</div>
+
+
+<div class="field">
+
+<label>
+Mật khẩu
+</label>
+
+<input
+    name="password"
+    type="password"
+    placeholder="Mật khẩu Wi-Fi"
+    minlength="8"
+    maxlength="63"
+    required
+>
+
+</div>
+
+
+<div class="field">
+
+<label>
+Ưu tiên
+</label>
+
+<input
+    name="priority"
+    type="number"
+    value="80"
+    min="-999"
+    max="999"
+>
+
+</div>
+
+
+</div>
+
+
+<div class="form-actions">
+
+<button
+    class="btn btn-outline"
+    name="mode"
+    value="save"
+>
+▣ Lưu vào danh sách
+</button>
+
+
+<button
+    class="btn btn-primary"
+    name="mode"
+    value="connect"
+    onclick="
+        return confirm(
+            'Lưu và chuyển sang Wi-Fi này? Kết nối web hiện tại có thể bị ngắt.'
+        )
+    "
+>
+⚡ Lưu & kết nối ngay
+</button>
+
+</div>
+
+
+</form>
+
+</section>
+
+
+</main>
+
+</div>
+
+
+
+<script>
+
+function toggleTheme() {
+
+    document.body.classList.toggle(
+        "dark"
+    );
+
+    localStorage.setItem(
+        "theme",
+        document.body.classList.contains(
+            "dark"
+        )
+            ? "dark"
+            : "light"
+    );
+}
+
+
+if (
+    localStorage.getItem(
+        "theme"
+    ) === "dark"
+) {
+    document.body.classList.add(
+        "dark"
+    );
+}
+
+
+function signalIcon(signal) {
+
+    if (signal >= 75) {
+        return "▂▄▆█";
+    }
+
+    if (signal >= 50) {
+        return "▂▄▆";
+    }
+
+    if (signal >= 30) {
+        return "▂▄";
+    }
+
+    return "▂";
+}
+
+
+async function scanWifi() {
+
+    const container =
+        document.getElementById(
+            "scan-list"
+        );
+
+    container.innerHTML =
+        '<div class="sub">Đang quét Wi-Fi...</div>';
+
+    try {
+
+        const response =
+            await fetch(
+                "/api/scan"
+            );
+
+        const result =
+            await response.json();
+
+        if (!result.ok) {
+            throw new Error(
+                result.error
+            );
+        }
+
+
+        container.innerHTML = "";
+
+
+        if (
+            result.data.length === 0
+        ) {
+
+            container.innerHTML =
+                '<div class="sub">Không tìm thấy mạng Wi-Fi.</div>';
+
+            return;
+        }
+
+
+        result.data.forEach(
+            network => {
+
+                const item =
+                    document.createElement(
+                        "div"
+                    );
+
+                item.className =
+                    "scan-item";
+
+
+                const safeSSID =
+                    network.ssid
+                        .replaceAll(
+                            "&",
+                            "&amp;"
+                        )
+                        .replaceAll(
+                            "<",
+                            "&lt;"
+                        )
+                        .replaceAll(
+                            ">",
+                            "&gt;"
+                        );
+
+
+                item.innerHTML = `
+                    <div>
+                        <div class="scan-name">
+                            ${safeSSID}
+                        </div>
+
+                        <div class="scan-security">
+                            ${network.security}
+                        </div>
+                    </div>
+
+                    <div class="signal-bars">
+                        ${signalIcon(
+                            network.signal
+                        )}
+                        ${network.signal}%
+                    </div>
+
+                    <button
+                        class="btn btn-outline"
+                    >
+                        Chọn
+                    </button>
+                `;
+
+
+                item
+                    .querySelector(
+                        "button"
+                    )
+                    .onclick =
+                        () => {
+
+                            document
+                                .getElementById(
+                                    "ssid-input"
+                                )
+                                .value =
+                                    network.ssid;
+
+                            document
+                                .getElementById(
+                                    "add"
+                                )
+                                .scrollIntoView({
+                                    behavior:
+                                        "smooth"
+                                });
+
+                        };
+
+
+                container.appendChild(
+                    item
+                );
+
+            }
+        );
+
+
+    } catch (error) {
+
+        container.innerHTML =
+            '<div class="flash error">'
+            + error.message
+            + '</div>';
+
+    }
+
+}
+
+</script>
+
+
+{% endif %}
+
+
+</body>
+
+</html>

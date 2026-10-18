@@ -1,0 +1,440 @@
+#!/usr/bin/env -S python3 -B
+
+import sys
+import json
+import subprocess
+import time
+import fcntl
+import re
+import secrets
+from pathlib import Path
+sys.path.insert(0, '/usr/local/lib/piwifi')
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+from contextlib import contextmanager
+import state as store
+
+NMCLI = "/usr/bin/nmcli"
+IFACE = "wlan0"
+FALLBACK = "Pi-Fallback"
+
+def submit_operation(action, target):
+    if action not in ('connect', 'hotspot'):
+        raise RuntimeError('Thao tác không hợp lệ')
+    uuid = validate_profile(FALLBACK if action == 'hotspot' else target)
+    current = store.read('operation.json', {})
+    if current.get('stage') in ('queued', 'connecting', 'address', 'awaiting-browser') and time.time() - current.get('updated', 0) < 150:
+        raise RuntimeError('Đang đổi mạng. Hãy chờ thao tác hiện tại hoàn tất.')
+    operation = secrets.token_hex(12)
+    data = dict(id=operation, action=action, target=uuid, stage='queued', timestamp=int(time.time()), updated=int(time.time()),
+                steps=[dict(stage='queued', timestamp=int(time.time()))])
+    store.write('operation.json', data)
+    try:
+        command(['/usr/bin/systemd-run', '--collect', '--unit=piwifi-switch-' + operation, '--on-active=2s',
+                 '--timer-property=AccuracySec=1s', '/usr/local/sbin/piwifi-helper', 'execute-operation', operation, uuid])
+    except Exception:
+        store.operation_update(operation, 'failed', message='Không khởi chạy được tác vụ đổi mạng')
+        raise
+    store.event('network', 'Đã yêu cầu chuyển sang ' + ('hotspot' if action == 'hotspot' else target))
+    return data
+
+def execute_operation(operation, target):
+    if not re.fullmatch('[0-9a-f]{24}', operation):
+        raise RuntimeError('Mã thao tác không hợp lệ')
+    saved = store.read('operation.json', {})
+    if saved.get('id') != operation or saved.get('target') != target or saved.get('stage') != 'queued':
+        raise RuntimeError('Thao tác không còn hợp lệ')
+    try:
+        store.operation_update(operation, 'connecting')
+        connect_profile(target)
+        ip = nm('-g', 'IP4.ADDRESS', 'device', 'show', IFACE)
+        if not ip:
+            raise RuntimeError('Chưa nhận được địa chỉ IP')
+        store.operation_update(operation, 'address', ip=ip)
+        store.operation_update(operation, 'awaiting-browser', ip=ip, message='Đã nhận IP; đang chờ trình duyệt kết nối lại')
+        store.event('network', 'Đã kết nối mạng mới và nhận IP ' + ip)
+    except Exception:
+        store.operation_update(operation, 'failed', message='Kết nối thất bại; cơ chế phục hồi sẽ kiểm tra lại sau 90 giây')
+        store.event('network', 'Đổi mạng thất bại; đang chờ kiểm tra phục hồi', 'warning')
+        raise
+
+def acknowledge_operation(operation):
+    current = store.read('operation.json', {})
+    if current.get('id') != operation or current.get('stage') != 'awaiting-browser':
+        raise RuntimeError('Thao tác chưa sẵn sàng xác nhận')
+    if validate_profile(get_active()) != current['target']:
+        raise RuntimeError('Pi không còn ở mạng đích')
+    store.operation_update(operation, 'confirmed', message='Trình duyệt đã kết nối lại dashboard')
+    store.event('network', 'Đổi mạng hoàn tất; dashboard đã được truy cập lại')
+    return {'confirmed': True}
+
+def deployments():
+    base = Path('/var/lib/piwifi-deploy')
+    result = []
+    if base.exists():
+        for p in sorted(base.iterdir(), reverse=True):
+            if p.is_dir() and not p.is_symlink() and re.fullmatch(r'\d{8}T\d{6}-\d+', p.name):
+                result.append(dict(id=p.name, bytes=sum(f.stat().st_size for f in p.iterdir() if f.is_file()),
+                                   restorable=(p/'restore.sh').is_file()))
+    return dict(current=store.read('release.json', {}), snapshots=result,
+                rollback=base.joinpath('latest').resolve().name if base.joinpath('latest').is_symlink() else None,
+                retention=5)
+
+def service_restart(name):
+    if name not in ('piwifi-web', 'piwifi-observer', 'piwifi-guard.timer'):
+        raise RuntimeError('Dịch vụ không nằm trong danh sách được phép')
+    command(['/usr/bin/systemd-run', '--collect', '--unit=piwifi-restart-' + secrets.token_hex(6),
+             '--on-active=2s', '/usr/bin/systemctl', 'restart', name])
+    store.event('service', 'Đã yêu cầu khởi động lại ' + name)
+    return {'queued': name}
+
+def rollback_latest():
+    base = Path('/var/lib/piwifi-deploy')
+    snapshot = (base / 'latest').resolve()
+    if snapshot.parent != base or not re.fullmatch(r'\d{8}T\d{6}-\d+', snapshot.name) or not (snapshot/'restore.sh').is_file():
+        raise RuntimeError('Không có bản phục hồi hợp lệ')
+    command(['/usr/bin/systemd-run', '--collect', '--unit=piwifi-ui-rollback', '--on-active=2s',
+             '/bin/bash', str(snapshot/'restore.sh')])
+    store.event('deploy', 'Đã yêu cầu phục hồi bản trước từ ' + snapshot.name, 'warning')
+    return {'queued': snapshot.name}
+
+@contextmanager
+def network_lock(wait=0):
+    with open('/run/piwifi-network.lock', 'a') as lock:
+        deadline=time.monotonic()+wait
+        while True:
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic()>=deadline:
+                    raise RuntimeError('Đang có thao tác mạng khác. Hãy thử lại sau.')
+                time.sleep(1)
+        try:
+            yield
+        finally:
+            fcntl.flock(lock, fcntl.LOCK_UN)
+
+def hotspot_info():
+    try:
+        fields = nm('-g', 'connection.uuid,802-11-wireless.ssid,802-11-wireless.mode,802-11-wireless-security.key-mgmt,ipv4.addresses,connection.autoconnect-priority', 'connection', 'show', 'id', FALLBACK).splitlines()
+        return dict(configured=True, ssid=fields[1], active=get_active()==FALLBACK,
+                    security='WPA-PSK' if fields[3]=='wpa-psk' else fields[3] or 'Không bảo mật',
+                    ip=fields[4].split('/')[0], priority=int(fields[5]), password_mask='••••••••')
+    except Exception:
+        return dict(configured=False, active=False)
+
+
+def command(args):
+    p = subprocess.run(args, text=True, capture_output=True, timeout=30)
+    if p.returncode != 0:
+        raise RuntimeError(p.stderr.strip() or p.stdout.strip() or "Command failed")
+    return p.stdout.strip()
+
+
+def nm(*args):
+    return command([NMCLI, *args])
+
+
+def split_nmcli(line):
+    """Split nmcli -t output while respecting backslash-escaped ':' characters."""
+    parts = []
+    buf = ""
+    escaped = False
+    for ch in line:
+        if escaped:
+            buf += ch
+            escaped = False
+        elif ch == "\\":
+            escaped = True
+        elif ch == ":":
+            parts.append(buf)
+            buf = ""
+        else:
+            buf += ch
+    parts.append(buf)
+    return parts
+
+
+def get_active():
+    try:
+        return nm("-g", "GENERAL.CONNECTION", "device", "show", IFACE).strip()
+    except Exception:
+        return ""
+
+
+def get_signal():
+    try:
+        raw = nm(
+            "-t", "-f", "IN-USE,SSID,SIGNAL",
+            "device", "wifi", "list",
+            "ifname", IFACE,
+            "--rescan", "no",
+        )
+        for line in raw.splitlines():
+            parts = split_nmcli(line)
+            if len(parts) >= 3 and parts[0] == "*":
+                try:
+                    signal = int(parts[2])
+                except ValueError:
+                    signal = 0
+                return {"ssid": parts[1], "signal": signal}
+    except Exception:
+        pass
+    return {"ssid": "", "signal": 0}
+
+
+def get_profiles():
+    result = []
+    raw = nm(
+        "-t", "-f", "NAME,TYPE,AUTOCONNECT,AUTOCONNECT-PRIORITY",
+        "connection", "show",
+    )
+
+    for line in raw.splitlines():
+        parts = split_nmcli(line)
+        if len(parts) < 4:
+            continue
+
+        name, typ, auto = parts[0], parts[1], parts[2]
+        try:
+            priority = int(parts[3])
+        except ValueError:
+            priority = 0
+
+        if typ not in ("wifi", "802-11-wireless"):
+            continue
+
+        try:
+            ssid = nm("-g", "802-11-wireless.ssid", "connection", "show", name)
+        except Exception:
+            ssid = ""
+
+        result.append({
+            "name": name,
+            "ssid": ssid,
+            "autoconnect": auto == "yes",
+            "priority": priority,
+            "fallback": name == FALLBACK,
+        })
+
+    result.sort(key=lambda x: x["priority"], reverse=True)
+    return result
+
+
+def scan_wifi():
+    raw = nm(
+        "-t", "-f", "SSID,SIGNAL,SECURITY",
+        "device", "wifi", "list",
+        "ifname", IFACE,
+        "--rescan", "yes",
+    )
+
+    networks = {}
+    for line in raw.splitlines():
+        parts = split_nmcli(line)
+        if len(parts) < 3:
+            continue
+
+        ssid = parts[0].strip()
+        if not ssid:
+            continue
+
+        try:
+            signal = int(parts[1])
+        except ValueError:
+            signal = 0
+
+        security = parts[2] or "Open"
+        if ssid not in networks or signal > networks[ssid]["signal"]:
+            networks[ssid] = {
+                "ssid": ssid,
+                "signal": signal,
+                "security": security,
+            }
+
+    return sorted(networks.values(), key=lambda x: x["signal"], reverse=True)
+
+
+def status():
+    active = get_active()
+    sig = get_signal()
+
+    def first_or_empty(field):
+        try:
+            value = nm("-g", field, "device", "show", IFACE)
+            return value.splitlines()[0] if value else ""
+        except Exception:
+            return ""
+
+    return {
+        "active": active,
+        "ip": first_or_empty("IP4.ADDRESS"),
+        "gateway": first_or_empty("IP4.GATEWAY"),
+        "dns": [value.strip() for value in re.split(r'[|\n]',nm('-g', 'IP4.DNS', 'device', 'show', IFACE)) if value.strip()],
+        "signal": sig["signal"],
+        "active_ssid": sig["ssid"],
+        "profiles": get_profiles(),
+        "hotspot": hotspot_info(),
+    }
+
+
+def save_wifi(ssid, password, priority):
+    priority = int(priority)
+
+    if not ssid:
+        raise RuntimeError("SSID không được để trống")
+    if len(ssid.encode('utf-8')) > 32:
+        raise RuntimeError('Tên mạng Wi-Fi không được vượt quá 32 byte UTF-8')
+    if priority < -999 or priority > 999:
+        raise RuntimeError("Priority phải từ -999 đến 999")
+    if len(password) < 8 or len(password) > 63:
+        raise RuntimeError("Password WPA phải từ 8 đến 63 ký tự")
+
+    existing = None
+    for profile in get_profiles():
+        if profile["ssid"] == ssid and not profile["fallback"]:
+            existing = profile["name"]
+            break
+
+    if existing:
+        name = existing
+    else:
+        name = "WiFi-" + ssid
+        nm(
+            "connection", "add",
+            "type", "wifi",
+            "ifname", IFACE,
+            "con-name", name,
+            "ssid", ssid,
+        )
+
+    nm(
+        "connection", "modify", name,
+        "wifi-sec.key-mgmt", "wpa-psk",
+        "wifi-sec.psk", password,
+        "connection.autoconnect", "yes",
+        "connection.autoconnect-priority", str(priority),
+    )
+    return name
+
+
+def validate_profile(name):
+    selector = 'uuid' if re.fullmatch(r'[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}', name) else 'id'
+    raw = nm('-g', 'connection.uuid,connection.type,connection.interface-name', 'connection', 'show', selector, name).splitlines()
+    if len(raw) < 2 or raw[1] != '802-11-wireless' or (len(raw) > 2 and raw[2] not in ('', IFACE)):
+        raise RuntimeError('Profile không thuộc Wi-Fi của thiết bị này')
+    return raw[0]
+
+def connect_profile(name, recovery=True):
+    uuid = validate_profile(name)
+    previous = get_active()
+    if recovery and previous and previous not in ('--', name):
+        previous_uuid = validate_profile(previous)
+        subprocess.run(['/usr/bin/systemctl', 'stop', 'piwifi-recover.timer', 'piwifi-recover.service'], capture_output=True, timeout=10)
+        command(['/usr/bin/systemd-run', '--collect', '--unit=piwifi-recover', '--on-active=90s',
+                 '--timer-property=AccuracySec=1s', '/usr/local/sbin/piwifi-helper', 'recover', previous_uuid, uuid])
+    nm('-w', '20', 'connection', 'up', 'uuid', uuid, 'ifname', IFACE)
+    if name == FALLBACK or uuid == validate_profile(FALLBACK):
+        Path('/run/piwifi-ap-hold-until').write_text(str(time.time()+120))
+
+def recover_profile(previous, expected):
+    active = get_active()
+    try:
+        if active not in ('', '--') and validate_profile(active) == validate_profile(expected):
+            ip = nm('-g', 'IP4.ADDRESS', 'device', 'show', IFACE)
+            state = nm('-g', 'GENERAL.STATE', 'device', 'show', IFACE)
+            if ip and state.startswith('100 '):
+                return
+    except RuntimeError:
+        pass
+    connect_profile(previous, recovery=False)
+    current = store.read('operation.json', {})
+    if current.get('target') == expected:
+        store.operation_update(current['id'], 'recovered', message='Đã phục hồi kết nối trước')
+    store.event('network', 'Đã phục hồi kết nối mạng trước', 'warning')
+
+
+def delete_profile(name):
+    validate_profile(name)
+    if name == FALLBACK:
+        raise RuntimeError("Không được xóa Pi-Fallback")
+    if name == get_active():
+        raise RuntimeError("Không thể xóa mạng đang sử dụng")
+    nm("connection", "delete", name)
+
+
+def set_priority(name, priority):
+    validate_profile(name)
+    if name == FALLBACK:
+        raise RuntimeError("Không thay priority fallback tại đây")
+    priority = int(priority)
+    if priority < -999 or priority > 999:
+        raise RuntimeError("Priority không hợp lệ")
+    nm("connection", "modify", name, "connection.autoconnect-priority", str(priority))
+
+
+def dispatch():
+    try:
+        if len(sys.argv) < 2:
+            raise RuntimeError("Thiếu action")
+
+        action = sys.argv[1]
+        if action == "status":
+            result = status()
+        elif action == 'submit-operation':
+            result = submit_operation(sys.argv[2], sys.argv[3])
+        elif action == 'execute-operation':
+            execute_operation(sys.argv[2], sys.argv[3])
+            result = {'executed': True}
+        elif action == 'ack-operation':
+            result = acknowledge_operation(sys.argv[2])
+        elif action == 'deployments':
+            result = deployments()
+        elif action == 'service-restart':
+            result = service_restart(sys.argv[2])
+        elif action == 'rollback-latest':
+            result = rollback_latest()
+        elif action == "scan":
+            result = scan_wifi()
+        elif action == "save":
+            result = {"profile": save_wifi(sys.argv[2], sys.argv[3], sys.argv[4])}
+            store.event('network', 'Đã lưu cấu hình Wi-Fi ' + sys.argv[2])
+        elif action == "connect":
+            connect_profile(sys.argv[2])
+            result = {"connected": sys.argv[2]}
+        elif action == "delete":
+            delete_profile(sys.argv[2])
+            result = {"deleted": sys.argv[2]}
+            store.event('network', 'Đã xóa profile Wi-Fi ' + sys.argv[2])
+        elif action == "priority":
+            set_priority(sys.argv[2], sys.argv[3])
+            result = {"updated": sys.argv[2]}
+            store.event('network', 'Đã đổi ưu tiên ' + sys.argv[2] + ' thành ' + str(int(sys.argv[3])))
+        elif action == 'recover':
+            recover_profile(sys.argv[2], sys.argv[3])
+            result = {'recovery_checked': True}
+        elif action == "hotspot":
+            connect_profile(FALLBACK)
+            result = {"hotspot": True}
+        else:
+            raise RuntimeError("Action không hợp lệ")
+
+        print(json.dumps({"ok": True, "data": result}, ensure_ascii=False))
+    except Exception as e:
+        print(json.dumps({"ok": False, "error": str(e)}, ensure_ascii=False))
+        sys.exit(1)
+
+def main():
+    if len(sys.argv) > 1 and sys.argv[1] not in ('status', 'scan', 'deployments'):
+        try:
+            with network_lock(wait=140 if sys.argv[1] in ('recover', 'execute-operation') else 0):
+                dispatch()
+        except RuntimeError as exc:
+            print(json.dumps({'ok':False,'error':str(exc)},ensure_ascii=False))
+            sys.exit(1)
+    else:
+        dispatch()
+
+
+if __name__ == "__main__":
+    main()

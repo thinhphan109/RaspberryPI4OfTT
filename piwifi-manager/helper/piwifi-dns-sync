@@ -1,0 +1,53 @@
+#!/usr/bin/python3 -B
+"""Update managed AdGuard LAN bindings only on network events; no periodic writes."""
+import fcntl
+import ipaddress
+import json
+from pathlib import Path
+import subprocess
+import sys
+import yaml
+
+CONFIG=Path('/etc/adguardhome/AdGuardHome.yaml')
+
+def run(args):
+    return subprocess.run(args,check=True,capture_output=True,text=True,timeout=60).stdout.strip()
+
+def hosts():
+    result=['127.0.0.1']
+    for row in json.loads(run(['ip','-j','-4','addr','show','dev','wlan0'])):
+        for record in row.get('addr_info',[]):
+            ip=ipaddress.IPv4Address(record['local'])
+            if ip.is_private and not ip.is_loopback and not ip.is_link_local and str(ip)!='192.168.50.1':result.append(str(ip))
+    return list(dict.fromkeys(result))
+
+def prepare():
+    data=yaml.safe_load(CONFIG.read_text())
+    desired=hosts()
+    if data['dns']['bind_hosts']==desired:return
+    data['dns']['bind_hosts']=desired
+    CONFIG.write_text(yaml.safe_dump(data,sort_keys=False))
+    CONFIG.chmod(0o600)
+
+def main():
+    if not CONFIG.is_file() or CONFIG.is_symlink():return
+    if '--prepare' in sys.argv:
+        prepare();return
+    with open('/run/lock/piwifi-dns-sync.lock','w') as lock:
+        fcntl.flock(lock,fcntl.LOCK_EX)
+        data=yaml.safe_load(CONFIG.read_text())
+        if data['dns']['bind_hosts']==hosts():return
+        # Stop first: AGH persists its current configuration when it exits.
+        run(['systemctl','stop','adguardhome'])
+        backup=CONFIG.read_bytes()
+        try:
+            prepare()
+            run(['/opt/adguardhome/AdGuardHome','-c',str(CONFIG),'-w','/opt/adguardhome/work','--check-config'])
+            run(['systemctl','start','adguardhome'])
+            run(['systemctl','is-active','--quiet','adguardhome'])
+        except Exception:
+            CONFIG.write_bytes(backup)
+            run(['systemctl','start','adguardhome'])
+            raise
+
+if __name__=='__main__':main()

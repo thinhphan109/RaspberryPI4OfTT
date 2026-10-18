@@ -1,0 +1,122 @@
+#!/usr/bin/env -S python3 -B
+"""Conservative Wi-Fi fallback and client-aware AP return, one timer pass."""
+import importlib.util
+import importlib.machinery
+import ipaddress
+import json
+import time
+from pathlib import Path
+
+loader = importlib.machinery.SourceFileLoader('piwifi_helper','/usr/local/sbin/piwifi-helper')
+helper = importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name,loader))
+loader.exec_module(helper)
+STATE = Path('/run/piwifi-guard.json')
+
+def previous_state():
+    try: return json.loads(STATE.read_text())
+    except (OSError,ValueError): return {}
+
+def clients():
+    """None means unknown, never zero. Associated stations protect idle clients."""
+    try:
+        stations = helper.command(['/usr/sbin/iw','dev',helper.IFACE,'station','dump'])
+        count = sum(line.startswith('Station ') for line in stations.splitlines())
+        address = helper.nm('-g','IP4.ADDRESS','device','show',helper.IFACE).splitlines()[0]
+        network = ipaddress.ip_interface(address).network
+        tcp = helper.command(['/usr/bin/ss','-Htn','state','established'])
+        for line in tcp.splitlines():
+            for token in line.split():
+                try:
+                    if ipaddress.ip_address(token.rsplit(':',1)[0]) in network:
+                        count = max(count,1)
+                except ValueError: pass
+        return count
+    except Exception: return None
+
+def candidates(visible=None):
+    result=[]
+    for profile in helper.get_profiles():
+        if profile['fallback'] or not profile['autoconnect']: continue
+        try:
+            if helper.nm('-g','802-11-wireless.mode','connection','show','id',profile['name']) not in ('','infrastructure'): continue
+            uuid=helper.validate_profile(profile['name'])
+            if visible is not None and profile['ssid'] not in visible: continue
+            result.append((profile['name'],uuid))
+        except Exception: continue
+    return result
+
+def run():
+    active=helper.get_active()
+    if active and active not in ('--',helper.FALLBACK):
+        return {'state':'preserved','profile':active,'empty_checks':0}
+    if helper.nm('radio','wifi') != 'enabled': return {'state':'radio-disabled'}
+    if active == helper.FALLBACK:
+        count=clients()
+        if count is None: return {'state':'clients-unknown','clients':None,'empty_checks':0}
+        if count: return {'state':'hotspot-in-use','clients':count,'empty_checks':0}
+        now=time.time(); old=previous_state()
+        try: hold=float(Path('/run/piwifi-ap-hold-until').read_text())
+        except FileNotFoundError: hold=0
+        except (OSError,ValueError): return {'state':'hold-unknown','empty_checks':0}
+        if now < max(hold,old.get('retry_after',0)):
+            return {'state':'hotspot-grace','clients':0,'empty_checks':0,'retry_after':max(hold,old.get('retry_after',0))}
+        checks=old.get('empty_checks',0)+1
+        if checks < 2: return {'state':'waiting-no-clients','clients':0,'empty_checks':checks}
+        try:
+            # Failed/unsupported scan preserves AP, never tears it down to scan.
+            scan=helper.command(['/usr/sbin/iw','dev',helper.IFACE,'scan'])
+            visible={line.strip()[6:] for line in scan.splitlines() if line.strip().startswith('SSID: ')}
+        except Exception: return {'state':'ap-scan-unavailable','clients':0,'empty_checks':checks,'retry_after':now+120}
+        choices=candidates(visible)
+        if not choices: return {'state':'no-known-wifi','clients':0,'empty_checks':checks,'retry_after':now+120}
+        if clients() != 0: return {'state':'client-arrived','empty_checks':0}
+        name,uuid=choices[0]
+        try:
+            helper.connect_profile(uuid)
+            return {'state':'returned-to-wifi','profile':name,'empty_checks':0}
+        except Exception:
+            helper.connect_profile(helper.FALLBACK,recovery=False)
+            return {'state':'return-failed-restored-ap','empty_checks':0,'retry_after':now+120}
+    state=helper.nm('-g','GENERAL.STATE','device','show',helper.IFACE)
+    if not state.startswith('30 '): return {'state':'device-busy-or-unavailable'}
+    deadline=time.monotonic()+120
+    for name,uuid in candidates():
+        if time.monotonic()>=deadline: break
+        if helper.get_active() not in ('','--'): return {'state':'preserved','profile':helper.get_active()}
+        try:
+            helper.connect_profile(uuid,recovery=False)
+            return {'state':'connected','profile':name}
+        except Exception: continue
+    if helper.get_active() not in ('','--'): return {'state':'preserved','profile':helper.get_active()}
+    helper.connect_profile(helper.FALLBACK,recovery=False)
+    return {'state':'fallback','empty_checks':0}
+
+if __name__=='__main__':
+    try:
+        with helper.network_lock():
+            try:
+                result=run()
+            except Exception as exc:
+                result={'state':'error','error':str(exc)}
+            result['timestamp']=int(time.time())
+            previous = previous_state()
+            if (previous.get('state'), previous.get('profile'), previous.get('clients')) != (result.get('state'), result.get('profile'), result.get('clients')):
+                labels = {'fallback':'Đã bật hotspot dự phòng', 'returned-to-wifi':'Đã tự trở về Wi-Fi',
+                          'hotspot-in-use':'Có thiết bị kết nối; giữ hotspot', 'clients-unknown':'Chưa xác định được client; giữ hotspot',
+                          'return-failed-restored-ap':'Thử Wi-Fi thất bại; đã khôi phục hotspot',
+                          'connected':'Đã kết nối Wi-Fi đã lưu', 'preserved':'Đang giữ kết nối Wi-Fi',
+                          'no-known-wifi':'Chưa thấy Wi-Fi đã lưu; giữ hotspot', 'error':'Guard gặp lỗi',
+                          'waiting-no-clients':'Hotspot không có client; đang kiểm tra lại',
+                          'hotspot-grace':'Đang chờ trước khi tự về Wi-Fi', 'client-arrived':'Client vừa kết nối; giữ hotspot',
+                          'ap-scan-unavailable':'Chưa quét được Wi-Fi trong chế độ hotspot',
+                          'radio-disabled':'Wi-Fi đang tắt', 'device-busy-or-unavailable':'Thiết bị Wi-Fi đang bận',
+                          'hold-unknown':'Chưa xác định được thời gian giữ hotspot'}
+                helper.store.event('fallback', labels.get(result['state'], result['state']) +
+                                   (' · ' + result['profile'] if result.get('profile') else ''),
+                                   'warning' if result['state'] in ('error', 'return-failed-restored-ap') else 'info')
+            temporary=STATE.with_suffix('.tmp')
+            temporary.write_text(json.dumps(result))
+            temporary.replace(STATE)
+            print(json.dumps(result))
+    except RuntimeError as exc:
+        print(json.dumps({'state':'busy-or-error','error':str(exc)}))

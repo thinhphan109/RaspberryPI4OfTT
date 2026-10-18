@@ -1,0 +1,20 @@
+[Unit]
+Description=EdgeVision camera bench (ESP32 OV5640, robot disabled)
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/edgevision-camera/source
+Environment=PYTHONPATH=%h/edgevision-camera/source/src
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=OPENBLAS_NUM_THREADS=1
+Environment=OMP_NUM_THREADS=1
+ExecStart=%h/edgevision-camera/venv/bin/python -B -m edgevision --port 18766 --camera http://192.168.0.104/api/frame --baseline tabletop --output %h/edgevision-camera/data/captures --table-dir %h/edgevision-camera/data/calibration --dataset-dir %h/edgevision-camera/data/dataset
+Restart=on-failure
+RestartSec=5
+CPUQuota=100%
+MemoryMax=384M
+UMask=0077
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,22 @@
+[Unit]
+Description=Pi dashboard telemetry and bounded local history
+After=NetworkManager.service piwifi-web.service
+
+[Service]
+User=thinh
+Group=thinh
+WorkingDirectory=/opt/piwifi-web
+StateDirectory=piwifi-observer
+StateDirectoryMode=0700
+RuntimeDirectory=piwifi-observer
+RuntimeDirectoryMode=0755
+ExecStart=/usr/bin/python3 /opt/piwifi-web/observer.py
+Restart=on-failure
+RestartSec=5
+PrivateTmp=true
+Environment=PYTHONDONTWRITEBYTECODE=1
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

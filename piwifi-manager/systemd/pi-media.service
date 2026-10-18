@@ -1,0 +1,12 @@
+[Unit]
+Description=Private Pi Media control agent
+After=pipewire.service
+
+[Service]
+ExecStart=/usr/bin/python3 -B /opt/piwifi-web/media_agent.py
+Restart=on-failure
+RestartSec=3
+UMask=0077
+
+[Install]
+WantedBy=default.target

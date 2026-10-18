@@ -1,0 +1,30 @@
+[Unit]
+Description=Raspberry Pi Wi-Fi Manager
+After=NetworkManager.service network.target
+Wants=NetworkManager.service
+
+[Service]
+Type=simple
+
+User=thinh
+Group=thinh
+
+WorkingDirectory=/opt/piwifi-web
+
+EnvironmentFile=/etc/piwifi-web.env
+
+ExecStart=/usr/bin/gunicorn \
+    --workers 1 \
+    --bind 0.0.0.0:18765 \
+    --access-logfile - \
+    --error-logfile - \
+    app:app
+
+Restart=on-failure
+RestartSec=3
+
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
