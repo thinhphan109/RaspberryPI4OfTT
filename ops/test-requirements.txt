@@ -1,0 +1,4 @@
+-r ../piwifi-manager/requirements.txt
+-r backup-requirements.txt
+PyYAML>=6,<7
+websocket-client>=1.8,<2
