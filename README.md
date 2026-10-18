@@ -28,6 +28,8 @@ Mở `Pi-Control.cmd` để dùng bộ công cụ Windows. Xem [README ứng d�
 
 ## Phạm vi lưu trữ
 
+Công cụ [sao lưu cấu hình có mã hóa](ops/BACKUP.md) lưu bản sao riêng trên Windows. GitHub Actions kiểm tra mã nguồn và quét bí mật trên mỗi push/PR; không tự triển khai lên Pi.
+
 Repository lưu mã nguồn, kiểm thử, tài liệu và tài nguyên giao diện. Mật khẩu, khóa SSH, cấu hình chạy thực tế, dữ liệu SQLite, log và snapshot phục hồi trên Pi không nằm trong bản sao này. Đây là bản lưu mã nguồn; muốn phục hồi toàn bộ hệ thống cần sao lưu dữ liệu và cấu hình trên Pi riêng.
 
 Các thử nghiệm phần cứng còn chờ xác nhận được ghi trong tài liệu từng phiên bản. Giữ giấy phép đi kèm font và mã bên thứ ba trong `ops/vendor/`.

@@ -39,3 +39,8 @@ id_ed25519*
 *.backup
 secrets/
 credentials/
+*.picbackup
+*.dpapi
+*.pickey
+/backups/
+/restore-test/

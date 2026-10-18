@@ -1,4 +1,4 @@
-﻿param([ValidateSet('GUI','Status','Authorize','Password','DnsTest','DnsEnable','DnsUpdate','DnsRestore','SSH','Camera')][string]$Action='GUI',[string]$Address)
+﻿param([ValidateSet('GUI','Status','Authorize','Password','DnsTest','DnsEnable','DnsUpdate','DnsRestore','SSH','Camera','Backup','BackupVerify','BackupKey')][string]$Action='GUI',[string]$Address)
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'pi-target.ps1')
 if ($Action -ne 'GUI') {
@@ -8,9 +8,12 @@ if ($Action -ne 'GUI') {
             if((Test-Path $autoState) -and (Get-Content $autoState -Raw|ConvertFrom-Json).Enabled){& (Join-Path $PSScriptRoot 'dns-watch.ps1') -Action Disable}
         }
         if ($Action -eq 'DnsRestore') { & (Join-Path $PSScriptRoot 'dns-windows.ps1') -Action Restore; exit }
+        if ($Action -eq 'BackupKey') { & (Join-Path $PSScriptRoot 'backup.ps1') -Action ExportKey -File (Join-Path $env:LOCALAPPDATA 'PiControl/backup/recovery.pickey'); exit }
+        if ($Action -eq 'BackupVerify') { & (Join-Path $PSScriptRoot 'backup.ps1') -Action Verify; exit }
         $pi=Get-PiConnection -Address $Address
         $sshArgs=$pi.SshOptions
         switch ($Action) {
+            'Backup' { & (Join-Path $PSScriptRoot 'backup.ps1') -Action Create -Address $pi.Address }
             'Authorize' { & (Join-Path $PSScriptRoot 'pi.ps1') -Action Authorize -Address $pi.Address }
             'Password' { & (Join-Path $PSScriptRoot 'adguard.ps1') -Action CopyPassword -Address $pi.Address }
             'DnsTest' { & (Join-Path $PSScriptRoot 'dns-windows.ps1') -Action Test -Address $pi.Address }
@@ -89,6 +92,10 @@ Add-Button 'Bật DNS AdGuard Home' {Launch-Task 'DnsEnable' $true}
 Add-Button 'Cập nhật DNS theo IP Pi' {Launch-Task 'DnsUpdate' $true}
 Add-Button 'Khôi phục DNS cũ' {Launch-Task 'DnsRestore' $true}
 Add-Button 'Mở SSH' {Launch-Task 'SSH'}
+Add-Button 'Sao lưu Pi có mã hóa' {Launch-Task 'Backup'}
+Add-Button 'Kiểm tra bản sao lưu' {Launch-Task 'BackupVerify'}
+Add-Button 'Xuất khóa phục hồi' {Launch-Task 'BackupKey'}
+Add-Button 'Mở thư mục sao lưu' {& (Join-Path $PSScriptRoot 'backup.ps1') -Action OpenFolder}
 function Launch-Watcher($action){
     try{
         $args=@('-NoProfile','-File',('"'+(Join-Path $PSScriptRoot 'dns-watch.ps1')+'"'),'-Action',$action)
@@ -118,11 +125,11 @@ $null=Add-Label 'Tự động DNS chạy nền cả khi đóng cửa sổ. Nếu
 $null=Add-Label 'Mật khẩu sudo chỉ nhập trong terminal. Công cụ không lưu mật khẩu và không tự cấp quyền Administrator.' 45
 $form.Add_Shown({try{$null=Resolve-SelectedPi}catch{$status.Text=$_.Exception.Message}})
 if($env:PI_CONTROL_CHECK_UI -eq '1'){
-    if($buttons.Controls.Count -ne 17){throw ('Unexpected button count '+$buttons.Controls.Count)}
+    if($buttons.Controls.Count -ne 21){throw ('Unexpected button count '+$buttons.Controls.Count)}
     $form.Show();[Windows.Forms.Application]::DoEvents();$form.PerformLayout()
     $bitmap=New-Object Drawing.Bitmap($form.Width,$form.Height)
     $form.DrawToBitmap($bitmap,(New-Object Drawing.Rectangle(0,0,$form.Width,$form.Height)))
     $bitmap.Save((Join-Path $env:TEMP 'pi-control-preview.png'),[Drawing.Imaging.ImageFormat]::Png)
-    $bitmap.Dispose();$form.Dispose();Write-Output 'Pi Control: 17 actions and form construction PASS';exit
+    $bitmap.Dispose();$form.Dispose();Write-Output 'Pi Control: 21 actions and form construction PASS';exit
 }
 $form.ShowDialog()|Out-Null

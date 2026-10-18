@@ -1,5 +1,7 @@
 # Raspberry Pi operations
 
+Encrypted off-Pi backup and GitHub checks: [BACKUP.md](BACKUP.md).
+
 Daily launcher: open `Pi-Control.cmd` at workspace root or Desktop **Pi Control**.
 Desktop audio processing: [EASYEFFECTS.md](EASYEFFECTS.md).
 Dashboard devices/Bluetooth: [AUDIO-BLUETOOTH.md](AUDIO-BLUETOOTH.md).
