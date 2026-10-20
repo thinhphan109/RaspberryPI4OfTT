@@ -82,6 +82,15 @@ profile trên Pi tắt đề nghị lưu mật khẩu. Cookie/phiên YouTube cũ
 giải mã được và cần đăng nhập lại; không xóa profile hoặc đổi mật khẩu keyring.
 Tài liệu Chromium: https://chromium.googlesource.com/chromium/src/+/HEAD/docs/linux/password_storage.md
 
+Kiểm tra live 20/10/2026: hai lần mở browser kết nối CDP, có video và trạng thái
+phát, error rỗng; ảnh desktop không còn hộp thoại keyring. uBOL2026.1018.2229
+được cài, disable_reasons rỗng. Đã trả Media về standby như trước kiểm tra.
+Chưa thử reboot vật lý. Release/snapshot: `20261020T053438-3023`.
+Sao lưu root-only các tệp cấu hình/cookie/login trước đổi thiết lập profile:
+`/var/lib/piwifi-media-recovery/20261020T123436/profile-config.tar.gz`.
+Rollback Dashboard phục hồi unit; thiết lập profile nằm ngoài source rollback,
+nên khi cần hoàn tác phải dừng browser và phục hồi riêng từ bản sao lưu này.
+
 Nút Raspberry Pi Connect là liên kết tới công cụ remote desktop của Raspberry Pi;
 không phải stream màn hình tích hợp và không tự cấu hình/tạo tài khoản Connect.
 
