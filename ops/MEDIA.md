@@ -73,10 +73,14 @@ Media điều khiển một cửa sổ Chromium riêng tại
 `~/.local/share/pi-media/chromium`. Không tiếp quản hoặc đóng các tab trình duyệt
 cũ. Nếu hai cửa sổ đều phát nhạc, tạm dừng cửa sổ cũ trực tiếp trên Pi.
 
-Lần đầu, hệ thống có thể hỏi mật khẩu keyring trên desktop và chặn trang tải.
-Chủ máy tự nhập/tạo mật khẩu trực tiếp trên Pi; không gửi mật khẩu qua chat hoặc
-Dashboard. Không vô hiệu hoá kho mật khẩu hoặc kiểm tra chứng chỉ. Đăng nhập
-YouTube trong cửa sổ Media nếu cần tài khoản; phiên đăng nhập tách khỏi Chromium cũ.
+Từ 20/10/2026, theo lựa chọn của chủ máy, chỉ cửa sổ Media dùng
+`--password-store=basic` để không hỏi mở khóa keyring khi tự đăng nhập desktop.
+Keyring hệ thống và các cửa sổ Chromium khác không đổi; kiểm tra chứng chỉ vẫn bật.
+Profile Media không còn dùng keyring bảo vệ dữ liệu nhạy cảm trên đĩa: chỉ dùng
+cho nghe/xem, không lưu mật khẩu hoặc dùng cho công việc nhạy cảm. Thiết lập
+profile trên Pi tắt đề nghị lưu mật khẩu. Cookie/phiên YouTube cũ có thể không
+giải mã được và cần đăng nhập lại; không xóa profile hoặc đổi mật khẩu keyring.
+Tài liệu Chromium: https://chromium.googlesource.com/chromium/src/+/HEAD/docs/linux/password_storage.md
 
 Nút Raspberry Pi Connect là liên kết tới công cụ remote desktop của Raspberry Pi;
 không phải stream màn hình tích hợp và không tự cấu hình/tạo tài khoản Connect.
@@ -112,7 +116,8 @@ luồng thực sự kết thúc hoặc bấm Bài tiếp.
 chối link ngoài YouTube đạt. Đã phát video thử, đọc tên/thời lượng, chỉnh âm lượng,
 tạm dừng/phát, tua và tự chuyển hàng đợi khi kết thúc. Preview bố cục desktop và
 390px không tràn ngang. Có lỗi keyring ở lần đầu/khởi động lại browser, chủ máy
-đã tự xử lý; phiên cuối quan sát được video đang phát. Không vô hiệu hoá keyring.
+đã tự xử lý; phiên cuối quan sát được video đang phát. Đây là kết quả lịch sử trước
+khi chủ máy chọn password-store basic riêng cho Media ngày 20/10/2026.
 
 Đã thêm hook giữ âm lượng qua navigation với CDP session sống lâu; cơ chế session
 có kiểm thử, nhưng lần xác minh chuyển-video sau sửa cuối chưa hoàn tất vì chủ máy
