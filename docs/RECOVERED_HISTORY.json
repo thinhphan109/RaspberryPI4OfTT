@@ -22,6 +22,16 @@
       "version": "3.14.1",
       "source": "pi-control\\docs\\V3141_CAMERA_POWER.md",
       "target": "piwifi-manager/docs/V3141_CAMERA_POWER.md"
+    },
+    {
+      "kind": "release-note",
+      "timestamp": 1792850697,
+      "date": "2026-10-24T21:04:57+07:00",
+      "title": "docs(history): Record UUID-guarded camera SSD storage",
+      "event_id": "legacy-ed6d65e83114db07214ed50a",
+      "version": "3.14.2",
+      "source": "pi-control\\docs\\V3142_CAMERA_SSD.md",
+      "target": "piwifi-manager/docs/V3142_CAMERA_SSD.md"
     }
   ]
 }
