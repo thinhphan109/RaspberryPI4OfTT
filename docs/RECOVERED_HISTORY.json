@@ -52,6 +52,16 @@
       "version": "3.14.4",
       "source": "pi-control\\docs\\V3144_CAMERA_JPEG.md",
       "target": "piwifi-manager/docs/V3144_CAMERA_JPEG.md"
+    },
+    {
+      "kind": "release-note",
+      "timestamp": 1792862279,
+      "date": "2026-10-25T00:17:59+07:00",
+      "title": "docs(history): Record compact interface and chart repairs",
+      "event_id": "legacy-68073bcc99980578625b5166",
+      "version": "4.0.4",
+      "source": "pi-control/docs/V40_INTERFACE.md",
+      "target": "piwifi-manager/docs/V40_INTERFACE.md"
     }
   ]
 }
