@@ -1,0 +1,17 @@
+{
+  "schema": "pi-control.recovered-git-history/v1",
+  "reconstructed_at": "2026-10-28T22:52:24+07:00",
+  "base": "29b1b81702499e67ab2acf90b1771c6b27924549",
+  "events": [
+    {
+      "kind": "release-note",
+      "timestamp": 1792826632,
+      "date": "2026-10-24T14:23:52+07:00",
+      "title": "docs(history): Record webcam and timelapse release",
+      "event_id": "legacy-a2661ef21ea4964073615247",
+      "version": "3.14.0",
+      "source": "pi-control\\docs\\V314_CAMERA.md",
+      "target": "piwifi-manager/docs/V314_CAMERA.md"
+    }
+  ]
+}
