@@ -42,6 +42,16 @@
       "version": "3.14.3",
       "source": "pi-control\\docs\\V3143_CAMERA_GALLERY.md",
       "target": "piwifi-manager/docs/V3143_CAMERA_GALLERY.md"
+    },
+    {
+      "kind": "release-note",
+      "timestamp": 1792852936,
+      "date": "2026-10-24T21:42:16+07:00",
+      "title": "docs(history): Record recovery from incomplete JPEG frames",
+      "event_id": "legacy-f73a990ff38d311ae917ab2a",
+      "version": "3.14.4",
+      "source": "pi-control\\docs\\V3144_CAMERA_JPEG.md",
+      "target": "piwifi-manager/docs/V3144_CAMERA_JPEG.md"
     }
   ]
 }
