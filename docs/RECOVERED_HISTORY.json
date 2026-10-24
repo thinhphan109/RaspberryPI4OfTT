@@ -62,6 +62,16 @@
       "version": "4.0.4",
       "source": "pi-control/docs/V40_INTERFACE.md",
       "target": "piwifi-manager/docs/V40_INTERFACE.md"
+    },
+    {
+      "kind": "release-note",
+      "timestamp": 1792862279,
+      "date": "2026-10-25T00:17:59+07:00",
+      "title": "docs(history): Record position calibration diagnostics",
+      "event_id": "legacy-68073bcc99980578625b5166",
+      "version": "4.0.4",
+      "source": "pi-control\\docs\\V404_CAMERA_POSITION.md",
+      "target": "piwifi-manager/docs/V404_CAMERA_POSITION.md"
     }
   ]
 }
