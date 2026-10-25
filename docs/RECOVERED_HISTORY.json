@@ -72,6 +72,16 @@
       "version": "4.0.4",
       "source": "pi-control\\docs\\V404_CAMERA_POSITION.md",
       "target": "piwifi-manager/docs/V404_CAMERA_POSITION.md"
+    },
+    {
+      "kind": "release-note",
+      "timestamp": 1792911755,
+      "date": "2026-10-25T14:02:35+07:00",
+      "title": "docs(history): Record bounded persistent system journal",
+      "event_id": "legacy-37766f15d3366510ff965d07",
+      "version": "4.1.0",
+      "source": "pi-control\\docs\\V41_SYSTEM_EVENTS.md",
+      "target": "piwifi-manager/docs/V41_SYSTEM_EVENTS.md"
     }
   ]
 }
