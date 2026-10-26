@@ -82,6 +82,16 @@
       "version": "4.1.0",
       "source": "pi-control\\docs\\V41_SYSTEM_EVENTS.md",
       "target": "piwifi-manager/docs/V41_SYSTEM_EVENTS.md"
+    },
+    {
+      "kind": "release-note",
+      "timestamp": 1793009581,
+      "date": "2026-10-26T17:13:01+07:00",
+      "title": "docs(history): Record repeated journal event aggregation",
+      "event_id": "legacy-d3e1f5e7f1bbb1a16b5e11b9",
+      "version": "4.1.1",
+      "source": "pi-control\\docs\\V411_LOG_SPAM.md",
+      "target": "piwifi-manager/docs/V411_LOG_SPAM.md"
     }
   ]
 }
