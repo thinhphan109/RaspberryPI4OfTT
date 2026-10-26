@@ -92,6 +92,16 @@
       "version": "4.1.1",
       "source": "pi-control\\docs\\V411_LOG_SPAM.md",
       "target": "piwifi-manager/docs/V411_LOG_SPAM.md"
+    },
+    {
+      "kind": "release-note",
+      "timestamp": 1793010836,
+      "date": "2026-10-26T17:33:56+07:00",
+      "title": "docs(history): Record Spotify Free Web Player integration",
+      "event_id": "legacy-92cd77f0964120c5db131d95",
+      "version": "4.2.0",
+      "source": "pi-control\\docs\\V42_SPOTIFY.md",
+      "target": "piwifi-manager/docs/V42_SPOTIFY.md"
     }
   ]
 }
