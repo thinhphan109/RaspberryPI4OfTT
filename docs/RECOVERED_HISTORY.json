@@ -154,6 +154,19 @@
       "bundle": "pi-control-ssd-20261027-r3",
       "manifest_sha256": "51b2071944481311d25b4a0a308736077f4edd7f68f61d3c58121714c7addb6a",
       "files": 4
+    },
+    {
+      "kind": "module-payload",
+      "timestamp": 1793088565,
+      "date": "2026-10-27T15:09:25+07:00",
+      "title": "feat(history): Recover media v1-adb97a8b6e6546f4",
+      "event_id": "f6ad5c5c66c444c89ae78c915796972c",
+      "module": "media",
+      "release": "v1-adb97a8b6e6546f4",
+      "source_hash": "adb97a8b6e6546f4f3278442ba4b2648acf594fb9015dcbf0bf7c8013416504a",
+      "bundle": "pi-control-ssd-20261027-r3",
+      "manifest_sha256": "51b2071944481311d25b4a0a308736077f4edd7f68f61d3c58121714c7addb6a",
+      "files": 6
     }
   ]
 }

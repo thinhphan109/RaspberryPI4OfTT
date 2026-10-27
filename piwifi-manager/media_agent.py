@@ -14,7 +14,9 @@ import urllib.parse
 import urllib.request
 import websocket
 from media_policy import PlaybackPolicy
-import audio_control
+from runtime_config import modular, location, unit
+if not modular():import audio_control
+import spotify_player as spotify
 
 PORT=18769
 HTTP=urllib.request.build_opener(urllib.request.ProxyHandler({}))
@@ -37,7 +39,7 @@ PROGRESS_AT=0
 RECOVERY_AT=0
 RECOVERY_COUNT=0
 NONSTOP_NOTE='Đã tắt'
-CONFIG=Path.home()/'.local/state/pi-media/nonstop.json'
+CONFIG=location('media_state',Path.home()/'.local/state/pi-media')/'nonstop.json'
 VOLUME_SCHEDULE=dict(enabled=False,start='22:00',end='07:00',limit=30)
 POLICY=PlaybackPolicy()
 POLICY_NOTE=''
@@ -45,6 +47,10 @@ POLICY_RETRY_AT=0
 STANDBY=False
 WAKE_URL=''
 WAKE_UNTIL=0
+PROVIDER='youtube'
+SPOTIFY_URL=spotify.HOME
+SPOTIFY_AD_FILTER=True
+SPOTIFY_PENDING=0
 
 def validate_schedule(d):
     if not isinstance(d,dict) or type(d.get('enabled')) is not bool:
@@ -74,22 +80,26 @@ def volume_tick(s):
     VOLUME=limited_volume(s.get('volume',VOLUME))
     if HOOK_VOLUME!=VOLUME:install_volume_hook(VOLUME)
     # Only lower volume; ending a window never raises it. No periodic disk write.
-    evaluate(f'(()=>{{window.__piMediaVolume={VOLUME}/100;const v=document.querySelector("video");if(v&&v.volume>{VOLUME}/100)v.volume={VOLUME}/100;return true}})()')
+    evaluate(f'(()=>{{window.__piMediaVolume={VOLUME}/100;const v=document.querySelector("video,audio");if(v&&v.volume>{VOLUME}/100)v.volume={VOLUME}/100;return true}})()')
 
 def save_nonstop():
     """Write only explicit user actions, never periodic playback samples."""
     CONFIG.parent.mkdir(parents=True,exist_ok=True,mode=0o700)
-    data=json.dumps(dict(enabled=NONSTOP,manual_pause=MANUAL_PAUSE,url=LAST_URL,volume=VOLUME,volume_schedule=VOLUME_SCHEDULE,preferences=POLICY.dump(),standby=STANDBY))
+    data=json.dumps(dict(enabled=NONSTOP,manual_pause=MANUAL_PAUSE,url=LAST_URL,volume=VOLUME,volume_schedule=VOLUME_SCHEDULE,preferences=POLICY.dump(),standby=STANDBY,provider=PROVIDER,spotify_url=SPOTIFY_URL,spotify_ad_filter=SPOTIFY_AD_FILTER))
     tmp=CONFIG.with_suffix('.tmp');tmp.write_text(data);tmp.chmod(0o600);tmp.replace(CONFIG)
 
 def load_nonstop():
-    global NONSTOP,MANUAL_PAUSE,LAST_URL,VOLUME,VOLUME_SCHEDULE,STANDBY
+    global NONSTOP,MANUAL_PAUSE,LAST_URL,VOLUME,VOLUME_SCHEDULE,STANDBY,PROVIDER,SPOTIFY_URL,SPOTIFY_AD_FILTER
     try:
         d=json.loads(CONFIG.read_text())
         if not isinstance(d,dict):return
         NONSTOP=d.get('enabled') is True;MANUAL_PAUSE=d.get('manual_pause') is True
         STANDBY=d.get('standby') is True
         POLICY.load(d.get('preferences'))
+        PROVIDER=d.get('provider') if d.get('provider') in ('youtube','spotify') else 'youtube'
+        SPOTIFY_AD_FILTER=d.get('spotify_ad_filter',True) is True
+        try:SPOTIFY_URL=spotify.url(d.get('spotify_url',spotify.HOME))
+        except ValueError:SPOTIFY_URL=spotify.HOME
         if type(d.get('volume')) in (int,float) and 0<=d['volume']<=100:VOLUME=d['volume']
         if 'volume_schedule' in d:VOLUME_SCHEDULE=validate_schedule(d['volume_schedule'])
         LAST_URL=youtube_url(d.get('url'))
@@ -114,10 +124,15 @@ def pages():
 
 def target():
     rows=pages()
+    if PROVIDER=='spotify':
+        for p in rows:
+            if spotify.is_page(p.get('url'),auth=True):return p
     for p in rows:
         if p['url'].startswith(('https://www.youtube.com/','https://music.youtube.com/')):return p
+    for p in rows:
+        if spotify.is_page(p.get('url'),auth=True):return p
     if len(rows)==1 and rows[0]['url']=='about:blank':return rows[0]
-    raise ValueError('Cửa sổ Media không ở YouTube; bấm Mở cửa sổ Media hoặc kiểm tra desktop')
+    raise ValueError('Cửa sổ Media chưa ở YouTube/Spotify; kiểm tra desktop Pi')
 
 def cdp(method,params=None):
     global WS,WS_TARGET,SEQUENCE
@@ -148,11 +163,11 @@ def evaluate(expression):
 
 def open_browser():
     if STANDBY:raise ValueError('Media đang nghỉ; bấm Bật Media trước')
-    subprocess.run(['systemctl','--user','start','pi-media-browser'],check=True,timeout=8,capture_output=True)
+    subprocess.run(['systemctl','--user','start',unit('pi-media-browser')],check=True,timeout=8,capture_output=True)
 
 def set_power(enabled):
     """Only the dedicated browser; networking, DNS and desktop stay available."""
-    global STANDBY,LAST_URL,VOLUME,WS,WS_TARGET,VOLUME_SCRIPT,HOOK_VOLUME,RECOVERY_AT,RECOVERY_COUNT,WAKE_URL,WAKE_UNTIL
+    global STANDBY,LAST_URL,VOLUME,WS,WS_TARGET,VOLUME_SCRIPT,HOOK_VOLUME,RECOVERY_AT,RECOVERY_COUNT,WAKE_URL,WAKE_UNTIL,SPOTIFY_URL
     if type(enabled) is not bool:raise ValueError('Trạng thái Media cần giá trị bật/tắt')
     if enabled:
         previous=STANDBY;STANDBY=False
@@ -160,16 +175,21 @@ def set_power(enabled):
         except Exception:
             STANDBY=previous;save_nonstop();raise
         RECOVERY_AT=0;RECOVERY_COUNT=0
-        if previous and NONSTOP and LAST_URL and not MANUAL_PAUSE and not POLICY.sleep_state()['expired']:
+        if previous and PROVIDER=='spotify':
+            WAKE_URL=spotify.HOME if MANUAL_PAUSE or POLICY.sleep_state()['expired'] else SPOTIFY_URL
+            WAKE_UNTIL=time.monotonic()+30
+        elif previous and NONSTOP and LAST_URL and not MANUAL_PAUSE and not POLICY.sleep_state()['expired']:
             if not POLICY.reason(LAST_URL.split('v=')[1],automatic=False):
                 WAKE_URL=LAST_URL;WAKE_UNTIL=time.monotonic()+30
     else:
         if not STANDBY:
             current=status()
-            if current.get('url'):LAST_URL=current['url']
+            if current.get('url'):
+                if PROVIDER=='spotify':SPOTIFY_URL=current['url']
+                else:LAST_URL=current['url']
             level=current.get('volume')
             if current.get('has_video') and type(level) in (int,float) and math.isfinite(level) and 0<=level<=100:VOLUME=level
-        subprocess.run(['systemctl','--user','stop','pi-media-browser'],check=True,timeout=8,capture_output=True)
+        subprocess.run(['systemctl','--user','stop',unit('pi-media-browser')],check=True,timeout=8,capture_output=True)
         previous=STANDBY;STANDBY=True
         try:save_nonstop()
         except Exception:STANDBY=previous;raise
@@ -184,9 +204,13 @@ def resume_tick():
     """Navigate explicitly after cold start; homepage previews are not playback."""
     global WAKE_URL
     if not WAKE_URL:return
-    if STANDBY or MANUAL_PAUSE or POLICY.sleep_state()['expired'] or time.monotonic()>WAKE_UNTIL:
+    if STANDBY or time.monotonic()>WAKE_UNTIL:
         WAKE_URL='';return
-    play(WAKE_URL)
+    if PROVIDER=='spotify':
+        install_volume_hook(limited_volume(VOLUME))
+        cdp('Page.navigate',{'url':spotify.url(WAKE_URL)})
+    elif MANUAL_PAUSE or POLICY.sleep_state()['expired']:WAKE_URL='';return
+    else:play(WAKE_URL)
     WAKE_URL=''
 
 def install_volume_hook(level):
@@ -248,7 +272,7 @@ def sleep_tick(s):
     global NONSTOP_NOTE
     if not POLICY.sleep_state()['expired']:return False
     NONSTOP_NOTE='Hết hẹn giờ ngủ; bấm Phát để nghe tiếp'
-    if s.get('connected'):evaluate(PAUSE_JS)
+    if s.get('connected'):evaluate(spotify.PAUSE_JS if PROVIDER=='spotify' else PAUSE_JS)
     return True
 
 def preference_tick(s,now=None):
@@ -270,6 +294,7 @@ def preference_tick(s,now=None):
     return False
 
 def status():
+    if PROVIDER=='spotify':return spotify_status()
     if STANDBY:
         return dict(standby=True,connected=False,title='Media đang nghỉ',queue=list(QUEUE),error='',nonstop=NONSTOP,manual_pause=MANUAL_PAUSE,nonstop_note='Đã đóng trình duyệt; Nonstop chờ bạn bật Media',volume_schedule=volume_policy(),up_next=None,preferences=POLICY.summary(),policy_note='Dashboard, Wi-Fi và DNS vẫn hoạt động.')
     try:
@@ -289,16 +314,116 @@ def status():
     except Exception:
         return dict(connected=False,title='Chưa kết nối cửa sổ Media',queue=list(QUEUE),error=ERROR,nonstop=NONSTOP,manual_pause=MANUAL_PAUSE,nonstop_note=NONSTOP_NOTE,volume_schedule=volume_policy(),up_next=None,preferences=POLICY.summary(),policy_note=POLICY_NOTE)
 
+
+def spotify_status():
+    common=dict(provider='spotify',standby=STANDBY,connected=False,title='Spotify',queue=[],up_next=None,
+                error=ERROR,nonstop=False,manual_pause=MANUAL_PAUSE,nonstop_note='',preferences=POLICY.summary(),
+                volume_schedule=volume_policy(),spotify_ad_filter=SPOTIFY_AD_FILTER,
+                policy_note='Spotify tự quản lý đề xuất và hàng đợi. Chống lặp/Không thích của Dashboard dùng cho YouTube.')
+    if STANDBY:return dict(common,title='Media đang nghỉ')
+    try:
+        page=target()
+        if not spotify.is_page(page.get('url')):
+            return dict(common,connected=True,login_required=True,notice='Hoàn tất đăng nhập Spotify trực tiếp trên Pi; Dashboard không nhận mật khẩu.')
+        return dict(common,**spotify.state(evaluate(spotify.STATE_JS)),connected=True)
+    except Exception:return dict(common,notice='Chưa đọc được Spotify; bấm mở Spotify hoặc kiểm tra cửa sổ trên Pi.')
+
+
+def select_source(source):
+    global PROVIDER,SPOTIFY_PENDING,ERROR,WS,WS_TARGET,VOLUME_SCRIPT,HOOK_VOLUME,WAKE_URL
+    if source not in ('youtube','spotify'):raise ValueError('Nguồn phát không hợp lệ')
+    if STANDBY:raise ValueError('Bật Media trước khi chọn nguồn phát')
+    open_browser()
+    # Source switching is explicit. Pause only this dedicated Media window.
+    try:
+        if PROVIDER=='spotify' and spotify.is_page(target().get('url')):
+            evaluate(spotify.PAUSE_JS);spotify.ad_filter(evaluate,False,False)
+        elif PROVIDER=='youtube':evaluate('(()=>{const v=document.querySelector("video");if(v)v.pause();return true})()')
+    except Exception:pass
+    previous=PROVIDER
+    try:
+        destination=SPOTIFY_URL if source=='spotify' else LAST_URL or 'https://www.youtube.com/'
+        install_volume_hook(limited_volume(VOLUME))
+        cdp('Page.navigate',{'url':destination})
+        PROVIDER=source
+        save_nonstop()
+    except Exception:PROVIDER=previous;raise
+    SPOTIFY_PENDING=0;WAKE_URL='';ERROR=''
+    return status()
+
+
+def spotify_dispatch(d):
+    global SPOTIFY_URL,SPOTIFY_AD_FILTER,SPOTIFY_PENDING,MANUAL_PAUSE,VOLUME,ERROR
+    action=d.get('action')
+    if STANDBY:raise ValueError('Bật Media trước khi điều khiển Spotify')
+    if action=='spotify_login':
+        cdp('Page.navigate',{'url':spotify.LOGIN});SPOTIFY_PENDING=0
+    elif action=='spotify_filter':
+        enabled=d.get('enabled')
+        if type(enabled) is not bool:raise ValueError('Lọc quảng cáo cần giá trị bật/tắt')
+        previous=SPOTIFY_AD_FILTER;SPOTIFY_AD_FILTER=enabled
+        try:save_nonstop()
+        except Exception:SPOTIFY_AD_FILTER=previous;raise
+        if not enabled and spotify.is_page(target().get('url')):spotify.ad_filter(evaluate,False,False)
+    elif action=='play':
+        destination=spotify.url(d.get('url'))
+        if POLICY.sleep_state()['expired']:
+            VOLUME=POLICY.sleep['volume'];POLICY.cancel_sleep()
+        install_volume_hook(limited_volume(VOLUME))
+        cdp('Page.navigate',{'url':destination})
+        SPOTIFY_URL=destination;MANUAL_PAUSE=False;SPOTIFY_PENDING=time.monotonic()+45
+        save_nonstop()
+    elif action in ('toggle','next','seek','volume'):
+        if not spotify.is_page(target().get('url')):raise ValueError('Hoàn tất đăng nhập Spotify trên Pi trước')
+        if action in ('toggle','next','seek'):SPOTIFY_PENDING=0
+        if action=='toggle':
+            if POLICY.sleep_state()['expired']:
+                VOLUME=POLICY.sleep['volume'];POLICY.cancel_sleep();install_volume_hook(limited_volume(VOLUME))
+            MANUAL_PAUSE=not status().get('paused',True)
+        value=d.get('value')
+        if action=='volume':
+            if type(value) not in (int,float) or not math.isfinite(value) or not 0<=value<=100:raise ValueError('Âm lượng phải từ 0 đến 100')
+            value=limited_volume(value)
+        spotify.control(evaluate,action,value)
+        if action=='volume':VOLUME=value;install_volume_hook(value)
+        if action in ('toggle','volume'):save_nonstop()
+    else:raise ValueError('Spotify quản lý tính năng này trong Web Player; chọn playlist hoặc dùng YouTube')
+    ERROR=''
+    return status()
+
+
+def spotify_tick():
+    global SPOTIFY_PENDING,ERROR
+    s=spotify_status()
+    if not s.get('connected') or s.get('login_required'):return
+    ERROR=''
+    volume_tick(s)
+    if sleep_tick(s):return
+    if MANUAL_PAUSE:SPOTIFY_PENDING=0
+    if SPOTIFY_PENDING:
+        if time.monotonic()>SPOTIFY_PENDING:SPOTIFY_PENDING=0
+        else:
+            try:matches=spotify.url(target()['url'])==SPOTIFY_URL
+            except ValueError:matches=False
+            if matches and spotify.activate(evaluate):SPOTIFY_PENDING=0
+    spotify.ad_filter(evaluate,SPOTIFY_AD_FILTER,s.get('ad',False))
+
 def dispatch(d):
     global ERROR,END_LATCH,VOLUME,NONSTOP,MANUAL_PAUSE,LAST_URL,RECOVERY_AT,RECOVERY_COUNT,NONSTOP_NOTE,VOLUME_SCHEDULE,POLICY_NOTE,WAKE_URL
     action=d.get('action','status')
     if action=='audio':
         payload=d.get('payload')
         if not isinstance(payload,dict):raise ValueError('Yêu cầu âm thanh không hợp lệ')
+        if modular():
+            import audio_client
+            return audio_client.call(payload)
         return audio_control.dispatch(payload)
     if action=='status':return status()
     if action=='power':return set_power(d.get('enabled'))
     if action=='start':return set_power(True)
+    if action=='source':return select_source(d.get('provider'))
+    if PROVIDER=='spotify' and action not in ('sleep','sleep_cancel','volume_schedule'):
+        return spotify_dispatch(d)
     if STANDBY and action in ('play','next','toggle','seek','volume','dislike'):
         raise ValueError('Media đang nghỉ; bấm Bật Media trước')
     if action in ('play','next','toggle'):WAKE_URL=''
@@ -331,7 +456,7 @@ def dispatch(d):
         if not current.get('has_video'):raise ValueError('Mở một video trước khi hẹn giờ ngủ')
         old_sleep=POLICY.sleep;old_deadline=POLICY.deadline
         POLICY.start_sleep(d.get('minutes'),current.get('volume',VOLUME))
-        LAST_URL=current.get('url') or LAST_URL
+        if PROVIDER=='youtube':LAST_URL=current.get('url') or LAST_URL
         try:save_nonstop()
         except Exception:POLICY.sleep=old_sleep;POLICY.deadline=old_deadline;raise
         return status()
@@ -420,7 +545,7 @@ return true;
 
 def nonstop_tick(s,now=None):
     global LAST_URL,LAST_PROGRESS,PROGRESS_AT,RECOVERY_AT,RECOVERY_COUNT,NONSTOP_NOTE
-    if STANDBY:return
+    if STANDBY or PROVIDER!='youtube':return
     now=time.monotonic() if now is None else now
     if POLICY.sleep_state()['expired']:NONSTOP_NOTE='Hết hẹn giờ ngủ; bấm Phát để nghe tiếp';return
     if not NONSTOP:return
@@ -455,6 +580,10 @@ def advance_loop():
         time.sleep(3)
         with LOCK:
             if STANDBY:continue
+            if PROVIDER=='spotify':
+                try:resume_tick();spotify_tick()
+                except Exception:ERROR='Chưa điều khiển được Spotify; kiểm tra Web Player trên Pi.'
+                continue
             if not QUEUE and not NONSTOP and not VOLUME_SCHEDULE['enabled'] and not POLICY.sleep and not POLICY.repeat['enabled'] and not POLICY.disliked:continue
             try:
                 resume_tick()
