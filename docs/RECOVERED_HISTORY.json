@@ -102,6 +102,19 @@
       "version": "4.2.0",
       "source": "pi-control\\docs\\V42_SPOTIFY.md",
       "target": "piwifi-manager/docs/V42_SPOTIFY.md"
+    },
+    {
+      "kind": "module-payload",
+      "timestamp": 1793088558,
+      "date": "2026-10-27T15:09:18+07:00",
+      "title": "feat(history): Recover network v1-cff85b25359b4762",
+      "event_id": "4c11e210be18488688b9836547a190a3",
+      "module": "network",
+      "release": "v1-cff85b25359b4762",
+      "source_hash": "cff85b25359b47620f37648b5dd99d54454f07dac1460b2a733d6e3c5d4d3555",
+      "bundle": "pi-control-ssd-20261027-r3",
+      "manifest_sha256": "51b2071944481311d25b4a0a308736077f4edd7f68f61d3c58121714c7addb6a",
+      "files": 9
     }
   ]
 }

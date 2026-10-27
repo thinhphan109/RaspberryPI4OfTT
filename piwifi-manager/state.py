@@ -3,8 +3,9 @@ import fcntl
 import json
 import time
 from pathlib import Path
+from runtime_config import location
 
-ROOT = Path('/var/lib/piwifi-events')
+ROOT = location('events','/var/lib/piwifi-events')
 
 def read(name, default=None):
     try:

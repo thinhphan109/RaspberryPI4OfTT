@@ -12,6 +12,7 @@ sys.path.insert(0, '/usr/local/lib/piwifi')
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 from contextlib import contextmanager
 import state as store
+from runtime_config import modular, unit as runtime_unit
 
 NMCLI = "/usr/bin/nmcli"
 IFACE = "wlan0"
@@ -68,6 +69,10 @@ def acknowledge_operation(operation):
     return {'confirmed': True}
 
 def deployments():
+    if modular():
+        modules=store.read('modules.json',{})
+        history=store.read('deploy-history.json',{'events':[]}).get('events',[])
+        return dict(current={'version':'Theo module'},snapshots=[],rollback=None,retention=0,modules=modules,history=history[-200:])
     base = Path('/var/lib/piwifi-deploy')
     result = []
     if base.exists():
@@ -83,11 +88,12 @@ def service_restart(name):
     if name not in ('piwifi-web', 'piwifi-observer', 'piwifi-guard.timer'):
         raise RuntimeError('Dịch vụ không nằm trong danh sách được phép')
     command(['/usr/bin/systemd-run', '--collect', '--unit=piwifi-restart-' + secrets.token_hex(6),
-             '--on-active=2s', '/usr/bin/systemctl', 'restart', name])
+             '--on-active=2s', '/usr/bin/systemctl', 'restart', runtime_unit(name)])
     store.event('service', 'Đã yêu cầu khởi động lại ' + name)
     return {'queued': name}
 
 def rollback_latest():
+    if modular():raise RuntimeError('Dùng rollback theo module trong bộ cài Pi Control')
     base = Path('/var/lib/piwifi-deploy')
     snapshot = (base / 'latest').resolve()
     if snapshot.parent != base or not re.fullmatch(r'\d{8}T\d{6}-\d+', snapshot.name) or not (snapshot/'restore.sh').is_file():

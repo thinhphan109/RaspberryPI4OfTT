@@ -1,0 +1,68 @@
+{
+  "schema": 1,
+  "modules": {
+    "dashboard": {
+      "label": "Dashboard và API", "kind": "managed", "requires": ["network", "observer"],
+      "packages": ["python3-flask", "gunicorn", "openssl", "python3-yaml"],
+      "files": ["app.py", "hub.py", "hardware.py", "metrics.py", "observer.py", "state.py", "security.py", "media.py", "camera.py", "audio_client.py", "storage_writes.py", "system_events.py", "deployment_history.py", "service_catalog.py", "service_catalog.json", "runtime_config.py", "apps.json", "templates", "static"],
+      "services": [{"id":"dashboard","unit":"pi-control-dashboard.service","legacy_unit":"piwifi-web.service","scope":"system","activation":"continuous","label":"Dashboard Pi Control","purpose":"Phục vụ trang quản lý và API; gửi yêu cầu tới các agent riêng.","stop_impact":"Mất trang quản lý; Wi-Fi, DNS, Media và Camera vẫn tiếp tục chạy.","normal_inactive":"Chỉ bình thường khi chủ động tắt giao diện.","dependencies":["network"]}]
+    },
+    "network": {
+      "label": "Wi-Fi và fallback", "kind": "managed", "requires": [],
+      "packages": ["network-manager", "iw", "iproute2", "sudo", "python3-yaml"],
+      "files": ["helper", "state.py", "runtime_config.py", "deployment_history.py", "service_catalog.py", "service_catalog.json"],
+      "services": [
+        {"id":"network-guard","unit":"pi-control-network-guard.service","legacy_unit":"piwifi-guard.service","scope":"system","activation":"oneshot","label":"Kiểm tra và phục hồi Wi-Fi","purpose":"Giữ kết nối đang có, thử mạng đã lưu hoặc phát hotspot cứu kết nối khi đủ điều kiện.","stop_impact":"Lượt kiểm tra hiện tại bị dừng; NetworkManager vẫn duy trì kết nối đang có.","normal_inactive":"Bình thường giữa các lượt chạy nếu timer hoạt động và lượt trước thành công.","dependencies":["NetworkManager.service"]},
+        {"id":"network-timer","unit":"pi-control-network-guard.timer","legacy_unit":"piwifi-guard.timer","scope":"system","activation":"timer","label":"Lịch kiểm tra Wi-Fi","purpose":"Gọi Wi-Fi guard định kỳ, độc lập với Dashboard.","stop_impact":"Ngừng kiểm tra phục hồi tự động; không chủ động ngắt Wi-Fi hiện tại.","normal_inactive":"Không bình thường nếu đang cần tự phục hồi mạng.","dependencies":["network-guard"]}
+      ]
+    },
+    "observer": {
+      "label": "Giám sát và nhật ký", "kind": "managed", "requires": [],
+      "packages": [],
+      "files": ["observer.py", "metrics.py", "state.py", "security.py", "storage_writes.py", "system_events.py", "runtime_config.py"],
+      "services": [{"id":"observer","unit":"pi-control-observer.service","legacy_unit":"piwifi-observer.service","scope":"system","activation":"continuous","label":"Bộ giám sát Pi","purpose":"Thu CPU/RAM/mạng, lượng ghi ổ hệ thống và sự kiện chọn lọc; cung cấp dữ liệu qua socket riêng.","stop_impact":"Tạm ngừng thu thập; lịch sử RAM mất khi agent khởi động lại, số liệu đã lưu bền vẫn giữ.","normal_inactive":"Chỉ khi chủ động dừng giám sát.","dependencies":[]}]
+    },
+    "media": {
+      "label": "YouTube và Spotify", "kind": "managed", "requires": ["audio"],
+      "packages": ["python3-websocket", "chromium", "libwidevinecdm0"],
+      "files": ["media_agent.py", "media_policy.py", "spotify_player.py", "audio_client.py", "runtime_config.py"],
+      "services": [
+        {"id":"media","unit":"pi-control-media.service","legacy_unit":"pi-media.service","scope":"user","activation":"continuous","label":"Agent điều khiển Media","purpose":"Nhận lệnh phát, hẹn giờ và chính sách nghe nhạc cho cửa sổ Media riêng.","stop_impact":"Mất điều khiển và các chính sách nền; browser có thể vẫn phát nhạc.","normal_inactive":"Chỉ khi không sử dụng agent điều khiển.","dependencies":["audio"]},
+        {"id":"media-browser","unit":"pi-control-media-browser.service","legacy_unit":"pi-media-browser.service","scope":"user","activation":"on-demand","label":"Trình duyệt phát nhạc","purpose":"Chromium riêng cho YouTube/Spotify; cần phiên desktop, đăng nhập tài khoản trực tiếp khi cần.","stop_impact":"Nhạc dừng và giải phóng tài nguyên browser; không tắt Audio/Bluetooth.","normal_inactive":"Bình thường khi chọn Cho Media nghỉ; không tự mở chỉ vì Dashboard truy cập.","dependencies":["desktop","pipewire.service"]}
+      ]
+    },
+    "audio": {
+      "label": "Âm thanh và Bluetooth", "kind": "managed", "requires": [],
+      "packages": ["pipewire", "pipewire-pulse", "wireplumber", "bluez", "easyeffects"],
+      "files": ["audio_agent.py", "audio_control.py", "runtime_config.py"],
+      "services": [{"id":"audio","unit":"pi-control-audio.service","legacy_unit":null,"scope":"user","activation":"continuous","label":"Agent âm thanh và Bluetooth","purpose":"Chọn loa/micro, chỉnh âm lượng và ghép thiết bị Bluetooth qua PipeWire/BlueZ; độc lập với Media.","stop_impact":"Không điều khiển âm thanh từ Dashboard được; đường phát âm thanh hiện có vẫn có thể tiếp tục.","normal_inactive":"Khi module chưa cài/bật hoặc phiên người dùng chưa sẵn sàng.","dependencies":["pipewire.service","wireplumber.service","bluetooth.service"]}]
+    },
+    "camera": {
+      "label": "Webcam và timelapse", "kind": "managed", "requires": ["render"],
+      "packages": ["ffmpeg", "python3-pil"],
+      "files": ["camera_agent.py", "camera_policy.py", "runtime_config.py", "render_jobs.py"],
+      "services": [{"id":"camera","unit":"pi-control-camera.service","legacy_unit":"pi-camera.service","scope":"user","activation":"continuous","label":"Agent Camera","purpose":"Quản lý webcam, phiên xem và ghi timelapse; agent chạy không đồng nghĩa webcam luôn bật.","stop_impact":"Ngắt preview/phiên ghi; phải kết thúc phiên trước khi cập nhật Camera. Render đã tách thành job riêng.","normal_inactive":"Agent chỉ dừng khi chủ động tắt module; thiếu webcam là trạng thái thiết bị riêng.","dependencies":["USB webcam","data mount","render"]}]
+    },
+    "render": {
+      "label": "Ghép video", "kind": "managed", "requires": [],
+      "packages": ["ffmpeg", "python3-pil"],
+      "files": ["camera_renderer.py", "render_jobs.py", "camera_agent.py", "camera_policy.py", "runtime_config.py"],
+      "services": [{"id":"render","unit":"pi-control-camera-render@.service","legacy_unit":null,"scope":"user","activation":"template","label":"Worker ghép video","purpose":"Mỗi job ghép ảnh thành MP4 chạy riêng với giới hạn CPU/RAM, không sở hữu webcam.","stop_impact":"Dừng job ghép; giữ ảnh gốc để thử lại, không coi video chưa đủ ảnh là hoàn tất.","normal_inactive":"Bình thường khi chưa có job; template không phải daemon cần chạy liên tục.","dependencies":["data mount","ffmpeg"]}]
+    },
+    "dns": {
+      "label": "AdGuard Home", "kind": "managed-vendor", "requires": ["network"],
+      "packages": ["python3-bcrypt", "python3-yaml", "bind9-dnsutils"], "files": [],
+      "services": [{"id":"dns","unit":"adguardhome.service","legacy_unit":"adguardhome.service","scope":"system","activation":"continuous","label":"DNS lọc quảng cáo AdGuard Home","purpose":"Phân giải DNS và lọc tên miền cho thiết bị đã chọn Pi làm DNS; không chặn chắc chắn quảng cáo nằm chung tên miền nội dung.","stop_impact":"Thiết bị đang dùng DNS của Pi có thể không mở được tên miền.","normal_inactive":"Chỉ khi DNS chưa cài/cấu hình hoặc chủ động không sử dụng.","dependencies":["network"]}]
+    },
+    "remote": {
+      "label": "Truy cập từ xa", "kind": "configure-after-install", "requires": [],
+      "packages": [], "files": [],
+      "services": [{"id":"tunnel","unit":"cloudflared.service","legacy_unit":"cloudflared.service","scope":"system","activation":"continuous","label":"Cloudflare Tunnel","purpose":"Đưa Dashboard ra tên miền khi có Internet và thông tin tunnel hợp lệ.","stop_impact":"Mất truy cập qua tên miền; Dashboard qua LAN vẫn hoạt động.","normal_inactive":"Bình thường nếu chưa cấu hình truy cập ngoài mạng.","dependencies":["Internet","Cloudflare account"]}]
+    },
+    "robot": {
+      "label": "EdgeVision Robot", "kind": "external-project", "requires": [],
+      "packages": [], "files": [],
+      "services": [{"id":"robot","unit":"edgevision-robot.service","legacy_unit":"edgevision-robot.service","scope":"user","activation":"on-demand","label":"Ứng dụng EdgeVision Robot","purpose":"Dự án thị giác/robot riêng, có bộ cài và dữ liệu riêng. Cần điều phối quyền dùng webcam với Camera.","stop_impact":"Ứng dụng robot/mô phỏng dừng; không đồng nghĩa dừng các module Pi Control khác.","normal_inactive":"Bình thường khi chưa deploy hoặc không sử dụng dự án robot.","dependencies":["external project","camera ownership"]}]
+    }
+  }
+}
