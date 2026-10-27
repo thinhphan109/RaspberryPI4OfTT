@@ -167,6 +167,19 @@
       "bundle": "pi-control-ssd-20261027-r3",
       "manifest_sha256": "51b2071944481311d25b4a0a308736077f4edd7f68f61d3c58121714c7addb6a",
       "files": 6
+    },
+    {
+      "kind": "module-payload",
+      "timestamp": 1793088566,
+      "date": "2026-10-27T15:09:26+07:00",
+      "title": "feat(history): Recover render v1-87301338a2dc48e9",
+      "event_id": "80e9805351d3465a97a4b6fe63a8b12b",
+      "module": "render",
+      "release": "v1-87301338a2dc48e9",
+      "source_hash": "87301338a2dc48e9b65e9aef7b89efdfb6d657f8ff545e21ee88fa2c1f1bddc5",
+      "bundle": "pi-control-ssd-20261027-r3",
+      "manifest_sha256": "51b2071944481311d25b4a0a308736077f4edd7f68f61d3c58121714c7addb6a",
+      "files": 6
     }
   ]
 }
