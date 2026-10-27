@@ -180,6 +180,19 @@
       "bundle": "pi-control-ssd-20261027-r3",
       "manifest_sha256": "51b2071944481311d25b4a0a308736077f4edd7f68f61d3c58121714c7addb6a",
       "files": 6
+    },
+    {
+      "kind": "module-payload",
+      "timestamp": 1793088567,
+      "date": "2026-10-27T15:09:27+07:00",
+      "title": "feat(history): Recover camera v1-5a997a333b6f95da",
+      "event_id": "4ae74787f8dc4f49bde7cea826f7ef56",
+      "module": "camera",
+      "release": "v1-5a997a333b6f95da",
+      "source_hash": "5a997a333b6f95dad8963307198d37d9901ee62d259a1d292ffeded0afa6de82",
+      "bundle": "pi-control-ssd-20261027-r3",
+      "manifest_sha256": "51b2071944481311d25b4a0a308736077f4edd7f68f61d3c58121714c7addb6a",
+      "files": 5
     }
   ]
 }
