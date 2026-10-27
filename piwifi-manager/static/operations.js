@@ -84,12 +84,47 @@
       if(d.error) row($('network-diagnostics'),'Trạng thái',d.error,'unknown');
       $('ops-updated').textContent=(m.stale?'Dữ liệu cũ · ':'Cập nhật · ')+date(m.timestamp);
   }
+  const eventKinds={storage:'Ổ lưu',usb:'USB',camera:'Camera',network:'Mạng',health:'Sức khỏe',service:'Dịch vụ',system:'Hệ thống'};
+  let eventRows=[],eventMeta={},eventLimit=40;
+  const fold=text=>String(text||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D').toLowerCase();
+  function drawEvents(){
+    const source=$('event-source').value||'all',level=$('event-level').value||'all',search=fold($('event-search').value);
+    const kind=e=>eventKinds[e.kind]?e.kind:'system';
+    const filtered=eventRows.filter(e=>(source==='all'||(source==='storage'?['storage','usb'].includes(kind(e)):kind(e)===source))&&
+      (level==='all'||(level==='attention'?['error','warning'].includes(e.level):e.level===level))&&
+      (!search||fold(`${e.message} ${e.detail||''} ${eventKinds[kind(e)]}`).includes(search)));
+    const list=$('event-list');
+    const opened=new Set(Array.from(list.children||[]).filter(n=>n.open).map(n=>n.dataset.event));
+    list.replaceChildren();
+    for(const e of filtered.slice(0,eventLimit)){
+      const entry=document.createElement('details');entry.className='event-entry';entry.dataset.level=e.level||'info';entry.dataset.event=e.id||`${e.timestamp}:${e.message}`;entry.open=opened.has(entry.dataset.event);
+      const summary=document.createElement('summary'),stamp=document.createElement('time'),tag=document.createElement('span'),title=document.createElement('span'),count=document.createElement('span');
+      stamp.dateTime=new Date(e.timestamp*1000).toISOString();stamp.textContent=date(e.timestamp);
+      tag.className='event-kind';tag.textContent=eventKinds[kind(e)];title.className='event-title';title.textContent=e.message;
+      count.className='event-count';count.textContent=e.count>1?`×${e.count}`:e.level==='error'?'Lỗi':e.level==='warning'?'Cảnh báo':'Thông tin';
+      summary.append(stamp,tag,title,count);
+      const detail=document.createElement('div');detail.className='event-detail';
+      const text=document.createElement('p');text.textContent=e.detail||'Không có chi tiết kỹ thuật bổ sung.';
+      const origin=document.createElement('p');origin.className='text-muted';origin.textContent=`${e.origin==='journal'?'Log Linux':e.origin==='observed'?'Trạng thái bộ giám sát quan sát được':'Thao tác quản trị'}${e.count>1?` · Từ ${date(e.first_timestamp||e.timestamp)} đến ${date(e.timestamp)}`:''}`;
+      if(e.source)origin.textContent+=' · '+e.source;
+      if(e.historical_only)origin.textContent+=' · Hệ thống SD cũ · Chỉ có lịch sử, không có bản rollback';
+      detail.append(text,origin);entry.append(summary,detail);list.append(entry);
+    }
+    if(!filtered.length)row(list,'Không có sự kiện',eventRows.length?'Thử đổi bộ lọc hoặc từ khóa.':'Chưa có sự kiện được ghi nhận.');
+    $('event-more').hidden=filtered.length<=eventLimit;
+    $('event-summary').textContent=`${Math.min(eventLimit,filtered.length)}/${filtered.length} sự kiện khớp trong ${eventRows.length} bản mới nhất${eventMeta.available?` · Lưu chọn lọc ${eventMeta.retention_days||30} ngày`:''}${eventMeta.limited?' · Có giới hạn số log đọc mỗi lượt':''}${eventMeta.error?' · '+eventMeta.error:''}`;
+  }
+  for(const id of ['event-source','event-level'])$(id).onchange=()=>{eventLimit=40;drawEvents()};
+  $('event-search').addEventListener('input',()=>{eventLimit=40;drawEvents()});
+  $('event-more').onclick=()=>{eventLimit+=40;drawEvents()};
+  $('event-refresh').onclick=refresh;
   async function refresh() {
     if(busy || !visible('activity')) return; busy=true;
     try {
-      const items=await get('/api/events');$('event-list').replaceChildren();
-      if(!items.length) row($('event-list'),'Chưa có sự kiện','Lịch sử bắt đầu từ bản cập nhật này');
-      items.forEach(e=>row($('event-list'),date(e.timestamp),e.message,e.level==='warning'?'failed':null));
+      const payload=await get('/api/events?summary=1');
+      if(!visible('activity'))return;
+      eventRows=Array.isArray(payload)?payload:payload.events||[];eventMeta=payload.meta||{};
+      drawEvents();$('ops-updated').textContent='Cập nhật '+new Date().toLocaleTimeString('vi-VN');
     } catch(e) { $('ops-updated').textContent='Dữ liệu cũ · '+e.message; }
     finally {busy=false;}
   }
@@ -118,6 +153,7 @@
       row($('deployment-info'),'Bản đang chạy',d.current.version||'Chưa có metadata');
       row($('deployment-info'),'Triển khai lúc',d.current.timestamp?date(d.current.timestamp):'—');
       row($('deployment-info'),'Mã nguồn SHA-256',d.current.source_hash||'—');
+      Object.entries(d.modules||{}).forEach(([name,release])=>row($('deployment-info'),name,release.release||release.version||'—'));
       (d.snapshots||[]).forEach(s=>row($('deployment-info'),s.id,(s.bytes/1048576).toFixed(1)+' MiB'+(s.id===d.rollback?' · bản phục hồi kế tiếp':'')));
       $('rollback-button').disabled=!d.rollback;
     } catch(e){$('deployment-info').textContent=e.message;}

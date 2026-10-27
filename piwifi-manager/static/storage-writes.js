@@ -29,8 +29,8 @@
   $('sd-write-rate').textContent=d.rate==null?'Chờ mẫu kế tiếp':bytes(d.rate)+'/s';
   $('sd-write-boot').textContent=bytes(d.boot_bytes);$('sd-write-total').textContent=bytes(d.total_bytes);
   $('sd-write-status').textContent=(d.stale?'Dữ liệu cũ · ':'')+'Cập nhật '+date(d.timestamp)+' · Đã lưu '+date(d.saved_at)+(d.error?' · '+d.error:'');
-  $('sd-rate-note').textContent=(d.rate_history?.length?'Trung bình từng khoảng; ':'Đang thu thập mẫu; ')+'chi tiết giữ 7 ngày, tổng theo giờ giữ 90 ngày.';
-  $('sd-daily-note').textContent=(d.daily_grouped?'Các ngày được gộp theo khoảng để vừa đồ thị. ':'Ngày 00:00–24:00, giờ Việt Nam; chốt ở lượt lấy mẫu đầu sau 00:00. ')+'Lịch sử lưu lâu dài, lưu gộp 5 phút/lần. Mất điện có thể thiếu phần chưa lưu của lần chạy trước.';
+  $('sd-rate-note').textContent=d.rate_history?.length?'Trung bình theo từng khoảng lấy mẫu.':'Đang thu thập mẫu.';
+  $('sd-daily-note').textContent=d.daily_grouped?'Đã gộp các ngày để vừa đồ thị · Giờ Việt Nam.':'Mỗi ngày 00:00–24:00 · Giờ Việt Nam.';
   draw();
  }
  async function refresh(){

@@ -2,11 +2,12 @@
 import json
 import os
 import socket
+from runtime_config import desktop_runtime
 
 def call(payload):
     with socket.socket(socket.AF_UNIX) as client:
         client.settimeout(12)
-        client.connect(f'/run/user/{os.getuid()}/pi-media.sock')
+        client.connect(str(desktop_runtime()/'pi-media.sock'))
         client.sendall(json.dumps(payload).encode()+b'\n')
         data=b''
         while not data.endswith(b'\n'):

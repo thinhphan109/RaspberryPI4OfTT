@@ -1,0 +1,50 @@
+<section id="camera" class="view-section">
+    <div class="page-header"><div><h1 class="page-title">Camera &amp; timelapse</h1><p class="text-muted">Xem máy in và lưu timelapse.</p></div><button id="camera-power" type="button" class="btn btn-primary">Bật camera</button>{{assist('camera')}}</div>
+    <p id="camera-message" role="status" aria-live="polite" class="text-sm text-muted"></p>
+    <div class="camera-auto"><label><input id="camera-automatic" type="checkbox" checked> Tự bật khi xem, tự tắt khi không dùng</label><span id="camera-power-note" class="text-sm text-muted">Giữ camera khi đang ghi timelapse. Không còn người xem: tự nghỉ sau 5 giây.</span></div>
+    <div class="camera-layout">
+        <article class="card camera-monitor">
+            <div class="ops-heading"><h2>Camera máy in</h2><span id="camera-live-state" class="badge">Đã tắt</span></div>
+            <div id="camera-stage" class="camera-stage">
+                <div id="camera-empty" class="camera-empty"><strong>Webcam đang nghỉ</strong><span>Bật camera để xem hình. Chỉ ghi ảnh khi bắt đầu một phiên.</span></div>
+                <img id="camera-image" alt="Hình trực tiếp từ webcam hướng vào máy in A1" hidden>
+                <canvas id="camera-regions" width="1280" height="720" tabindex="0" aria-label="Chọn vùng ảnh: kéo chuột hoặc dùng phím mũi tên; giữ Shift để đổi kích thước" hidden></canvas>
+            </div>
+            <div class="camera-caption"><span id="camera-source">720p · Xem trực tiếp tối đa 4 ảnh/giây</span><span id="camera-match">Chưa có mẫu vị trí</span></div>
+            <div id="camera-position-actions" class="hub-actions camera-preview-actions" hidden><button id="camera-freeze" type="button" class="btn btn-outline">Giữ ảnh mẫu</button><button id="camera-live" type="button" class="btn btn-outline" hidden>Trở lại trực tiếp</button></div>
+            <div id="camera-position-settings" class="camera-calibration" hidden>
+                <button id="camera-roi-head" type="button" class="btn btn-outline">1 · Chọn vùng đầu in</button>
+                <button id="camera-roi-bed" type="button" class="btn btn-outline">2 · Chọn vùng bàn in</button>
+                <label>Sai lệch tối đa (%)<input id="camera-threshold" type="number" min="2" max="20" step="1" value="6"></label>
+                <label>Ổn định (giây)<input id="camera-settle" type="number" min="0.1" max="2" step="0.1" value="0.2"></label>
+                <button id="camera-calibrate" type="button" class="btn btn-outline">Lưu vị trí chụp</button>
+            </div>
+            <p id="camera-calibration-note" hidden class="text-sm text-muted">Giữ ảnh đúng vị trí, chọn hai vùng rồi lưu mẫu. Mở Trợ giúp để xem cách hiệu chỉnh.</p>
+            <p id="camera-calibration-warning" hidden class="camera-calibration-warning text-sm"></p>
+        </article>
+        <div class="camera-sidebar">
+            <article class="card">
+                <div class="ops-heading"><h2>Phiên timelapse</h2><span id="camera-record-state" class="badge">Sẵn sàng</span></div>
+                <label class="camera-field">Cách chụp<select id="camera-mode"><option value="interval">Theo thời gian</option><option value="position">Theo vị trí · Thử nghiệm</option></select></label>
+                <label id="camera-interval-field" class="camera-field">Mỗi bao nhiêu giây?<input id="camera-interval" type="number" min="2" max="60" value="5"></label>
+                <p id="camera-mode-note" class="text-sm text-muted">Chụp đều theo thời gian; bàn in và đầu in vẫn di chuyển trong video.</p>
+                <label class="camera-field">Lưu vào<select id="camera-storage"><option value="ram">RAM · Thử tối đa 10 phút</option></select></label>
+                <p id="camera-storage-note" class="text-sm text-muted">Đang kiểm tra nơi lưu. Ổ đã chọn được ghi nhớ; không tự chuyển sang thẻ SD.</p>
+                <div class="camera-counters"><div><strong id="camera-count">0</strong><span>Ảnh đã lưu</span></div><div><strong id="camera-elapsed">00:00</strong><span>Thời gian</span></div></div>
+                <p id="camera-session-note" class="text-sm text-muted">Chưa có phiên ghi.</p>
+                <p id="camera-tracking" hidden class="text-sm text-muted"></p>
+                <div class="hub-actions"><button id="camera-record" type="button" class="btn btn-primary">Bắt đầu phiên</button><button id="camera-stop" type="button" class="btn btn-outline" disabled>Kết thúc &amp; ghép</button></div>
+                
+            </article>
+            <article class="card"><div class="ops-heading"><h2>Video &amp; ảnh gốc</h2><button id="camera-library-refresh" type="button" class="btn btn-ghost">Làm mới</button></div><div id="camera-library" class="camera-library"><p class="text-muted text-sm">Chưa tải danh sách.</p></div></article>
+        </div>
+    </div>
+    <dialog id="camera-gallery" class="camera-gallery" aria-labelledby="camera-gallery-title">
+        <header class="camera-gallery-heading"><div><span class="eyebrow">ẢNH GỐC CỦA PHIÊN</span><h2 id="camera-gallery-title">Xem ảnh đã chụp</h2><p id="camera-gallery-session" class="text-muted"></p></div><button id="camera-gallery-close" type="button" class="btn btn-outline" autofocus>Đóng</button></header>
+        <div class="camera-gallery-stage"><img id="camera-gallery-image" alt="Ảnh đã chụp trong phiên timelapse" hidden><p id="camera-gallery-message" role="status" aria-live="polite">Đang tải danh sách ảnh…</p></div>
+        <div class="camera-gallery-position"><strong id="camera-gallery-count" aria-live="polite">Chưa có ảnh</strong><span id="camera-gallery-file" class="text-muted"></span></div>
+        <label class="camera-gallery-scrub">Chọn ảnh<input id="camera-gallery-range" type="range" min="1" max="1" value="1" step="1" disabled></label>
+        <footer class="camera-gallery-controls"><div class="hub-actions"><button id="camera-gallery-prev" type="button" class="btn btn-outline" disabled>← Trước</button><button id="camera-gallery-next" type="button" class="btn btn-outline" disabled>Sau →</button></div><label class="camera-gallery-jump">Đến ảnh<input id="camera-gallery-jump" type="number" min="1" max="1" value="1" inputmode="numeric" disabled></label><a id="camera-gallery-download" class="btn btn-primary" download hidden>Tải ảnh gốc</a></footer>
+        <p class="camera-gallery-hint text-muted">Dùng ← → hoặc kéo thanh để chuyển ảnh. Chỉ tải ảnh đang xem; bấm mở lại phiên để cập nhật ảnh mới.</p>
+    </dialog>
+</section>

@@ -14,7 +14,8 @@ import urllib.request
 from pathlib import Path
 
 CATALOG = Path(__file__).with_name('apps.json')
-PASSWORD = Path('/home/thinh/.config/adguardhome/credentials.json')
+from runtime_config import location
+PASSWORD = location('adguard_credentials','/home/thinh/.config/adguardhome/credentials.json')
 HTTP = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
 def catalog():

@@ -6,12 +6,11 @@
     <meta name="color-scheme" content="light dark">
     <title>Raspberry Pi 4 — Bảng điều khiển</title>
     <link rel="icon" href="{{url_for('static',filename='raspberry-pi.png',v=asset_version)}}">
-    
+
     <script src="{{url_for('static',filename='theme.js',v=asset_version)}}"></script>
     <link rel="stylesheet" href="{{url_for('static',filename='dashboard.css',v=asset_version)}}">
     <link rel="stylesheet" href="{{url_for('static',filename='studio.css',v=asset_version)}}">
 
-    
 </head>
 <body>
 
@@ -24,6 +23,8 @@
     </div>
 </a>
 {% endmacro %}
+
+{% macro assist(page) %}<button type="button" class="btn btn-outline page-help" data-help-page="{{page}}" aria-haspopup="dialog">{{icon('help')}} Trợ giúp</button>{% endmacro %}
 
 {% macro token() %}<input type="hidden" name="csrf" value="{{csrf}}">{% endmacro %}
 
@@ -45,6 +46,12 @@
     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
     {% elif name=='music' %}
     <path d="M9 18V5l12-2v13M9 8l12-2"/><ellipse cx="6" cy="18" rx="3" ry="3"/><ellipse cx="18" cy="16" rx="3" ry="3"/>
+    {% elif name=='help' %}
+    <circle cx="12" cy="12" r="9"/><path d="M9.4 9a2.8 2.8 0 0 1 5.2 1.4c0 1.8-2.6 2-2.6 3.6M12 17h.01"/>
+    {% elif name=='camera' %}
+    <path d="M8 6l2-3h4l2 3h4v14H4V6z"/><circle cx="12" cy="12" r="4"/>
+    {% elif name=='headphones' %}
+    <path d="M4 14v-3a8 8 0 0 1 16 0v3M4 13h4v8H4zM16 13h4v8h-4z"/>
     {% elif name=='apps' %}
     <rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><path d="M17.5 14v7M14 17.5h7"/>
     {% endif %}
@@ -57,7 +64,6 @@
 </button>
 {% endmacro %}
 
-
 {% if login_mode %}
 <div class="auth-layout">
     <main class="card auth-card">
@@ -68,9 +74,9 @@
             <h1 class="page-title" style="font-size: 22px;">Xác thực truy cập</h1>
             <p class="text-muted text-sm">Vui lòng đăng nhập để vào bảng điều khiển.</p>
         </div>
-        
+
         {% if error %}<div class="notice error" role="alert">{{error}}</div>{% endif %}
-        
+
         <form method="post" action="/login">
             <div class="form-group">
                 <label for="username">Tên đăng nhập</label>
@@ -97,14 +103,14 @@
         <p class="text-muted text-sm" style="margin-bottom: 22px;">
             Mạng hiện tại có thể bị ngắt. Pi sẽ tự động thử khôi phục lại nếu cấu hình mạng mới thất bại.
         </p>
-        
+
         {% if hotspot_switch %}
         <div class="notice" style="justify-content: center;">
             Kết nối vào hotspot, sau đó mở <br>
             <a href="http://192.168.50.1:18765" class="text-mono" style="font-weight: 600; color: var(--brand);">192.168.50.1:18765</a>
         </div>
         {% endif %}
-        
+
         <a class="btn btn-outline btn-full" href="/">Kiểm tra trạng thái</a>
         <div id="operation-progress" class="ops-strip" role="status" aria-live="polite" style="margin-top:20px"></div>
         <ol id="operation-steps" class="operation-steps" aria-label="Các bước đổi mạng"></ol>
@@ -116,8 +122,9 @@
 </div>
 
 {% else %}
+<a id="ui-skip" class="skip-link" href="#main-content">Đến nội dung chính</a>
 <div class="app-layout">
-    
+
     <!-- Sidebar Navigation -->
     <aside class="sidebar">
         <header class="sidebar-header">
@@ -129,24 +136,15 @@
         </header>
         <nav class="sidebar-nav" aria-label="Điều hướng">
             <span class="eyebrow" style="margin: 8px 12px 6px;">Không gian làm việc</span>
-            <a href="#overview" class="nav-item active" data-tab="overview" aria-current="page">
-                {{icon('overview')}} Tổng quan thiết bị
-            </a>
-            <a href="#network" class="nav-item" data-tab="network">
-                {{icon('wifi')}} Kết nối mạng
-            </a>
-            <a href="#apps" class="nav-item" data-tab="apps">{{icon('apps')}} Ứng dụng & Truy cập</a>
-            <a href="#media" class="nav-item" data-tab="media">{{icon('music')}} Media · Điều khiển nhạc</a>
-            <a href="#audio" class="nav-item" data-tab="audio">{{icon('music')}} Âm thanh &amp; Bluetooth</a>
-            <a href="#storage" class="nav-item" data-tab="storage">
-                {{icon('storage')}} Hệ thống & Lưu trữ
-            </a>
-            <a href="#gpio" class="nav-item" data-tab="gpio">
-                {{icon('cpu')}} Chân cắm GPIO
-            </a>
-            <a href="#activity" class="nav-item" data-tab="activity">
-                {{icon('refresh')}} Nhật ký hoạt động
-            </a>
+            <a href="#overview" class="nav-item active" data-tab="overview" aria-current="page">{{icon('overview')}} Tổng quan</a>
+            <a href="#network" class="nav-item" data-tab="network">{{icon('wifi')}} Kết nối mạng</a>
+            <a href="#apps" class="nav-item" data-tab="apps">{{icon('apps')}} Ứng dụng &amp; DNS</a>
+            <a href="#media" class="nav-item" data-tab="media">{{icon('music')}} Media</a>
+            <a href="#audio" class="nav-item" data-tab="audio">{{icon('headphones')}} Âm thanh</a>
+            <a href="#camera" class="nav-item" data-tab="camera">{{icon('camera')}} Camera</a>
+            <a href="#storage" class="nav-item" data-tab="storage">{{icon('storage')}} Lưu trữ</a>
+            <a href="#gpio" class="nav-item" data-tab="gpio">{{icon('cpu')}} GPIO</a>
+            <a href="#activity" class="nav-item" data-tab="activity">{{icon('refresh')}} Hoạt động</a>
         </nav>
         <footer class="sidebar-footer">
             {{theme()}}
@@ -157,92 +155,84 @@
     </aside>
 
     <!-- Main Content Area -->
-    <main class="main-panel">
-        <div class="workspace-bar"><span class="workspace-label"><span class="workspace-mark" aria-hidden="true"></span> KHÔNG GIAN CÁ NHÂN</span><span class="workspace-device">RASP-TT <span>/</span> CONTROL CENTER</span></div>
-        
-        {% if error %}<div class="notice error" role="alert">{{error}}</div>{% endif %}
+    <main id="main-content" class="main-panel" tabindex="-1">
+{% if error %}<div class="notice error" role="alert">{{error}}</div>{% endif %}
         {% for category,message in get_flashed_messages(with_categories=true) %}
-        <div class="notice badge-success" role="status">{{message}}</div>
+        <div id="server-feedback-{{loop.index}}" class="ui-feedback" data-flash data-tone="{{'error' if category=='error' else 'success'}}" role="{{'alert' if category=='error' else 'status'}}">{{message}}</div>
         {% endfor %}
 
+        {% include 'camera.html' %}
         <section id="media" class="view-section">
-            <div class="page-header"><div><span class="eyebrow">PHÁT TRÊN RASPBERRY PI</span><h1 class="page-title">Không gian nghe nhạc</h1><p class="text-muted">Chọn trên điện thoại. Âm thanh phát ra loa của Pi.</p></div><div class="hub-actions"><button id="media-start" class="btn btn-outline" type="button">Bật Media</button><button class="btn btn-outline" type="button" data-media-power="off">Cho Media nghỉ</button></div></div>
+            <div class="page-header"><div><h1 class="page-title">Media</h1><p class="text-muted">Điều khiển nhạc phát trên loa của Pi.</p></div><div class="hub-actions"><button id="media-start" class="btn btn-outline" type="button">Bật Media</button><button class="btn btn-outline" type="button" data-media-power="off">Cho Media nghỉ</button></div>{{assist('media')}}</div>
             <div class="media-layout">
                 <article class="media-player">
                     <div class="media-topline">
                     <span id="media-state" class="badge badge-warning">Đang kết nối…</span>
-                    <button id="media-nonstop" type="button" class="btn btn-outline" aria-pressed="false">Bật Nonstop</button></div><p id="media-nonstop-note" class="text-sm text-muted" role="status"></p>
+                    <button id="media-nonstop" data-youtube-only type="button" class="btn btn-outline" aria-pressed="false">Bật Nonstop</button></div><p id="media-nonstop-note" data-youtube-only class="text-sm text-muted" role="status"></p>
                     <div class="media-player-main">
-                    <div class="media-art"><img id="media-art" alt="Ảnh bìa video đang phát" hidden><span id="media-art-empty">♪</span></div>
+                    <div class="media-art"><img id="media-art" alt="Ảnh bìa đang phát" hidden><span id="media-art-empty">♪</span></div>
                     <div class="media-track-info">
                     <span class="eyebrow">ĐANG PHÁT</span><h2 id="media-title">Chưa có video</h2>
                     <a id="media-video-link" target="_blank" rel="noopener" hidden>Mở video này trên điện thoại ↗</a>
-                    <progress id="media-progress" value="0" max="1" aria-label="Tiến độ video"></progress><p id="media-time" class="text-muted">0:00 / 0:00</p>
+                    <progress id="media-progress" value="0" max="1" aria-label="Tiến độ phát"></progress><p id="media-time" class="text-muted">0:00 / 0:00</p>
                     </div></div>
                     <div class="media-controls"><button class="btn btn-outline" data-media="seek" data-value="-10">−10 giây</button><button id="media-toggle" class="btn btn-primary" data-media="toggle">Phát / Dừng</button><button class="btn btn-outline" data-media="seek" data-value="10">+10 giây</button><button class="btn btn-outline" data-media="next">Bỏ qua bài này →</button></div>
-                    <div class="media-volume-controls"><div><label for="media-volume">Âm lượng video <span id="media-volume-value"></span></label><input id="media-volume" type="range" min="0" max="100" value="50">
+                    <div class="media-volume-controls"><div><label for="media-volume">Âm lượng phát <span id="media-volume-value"></span></label><input id="media-volume" type="range" min="0" max="100" value="50">
                     <p id="media-limit-note" class="text-sm text-muted" role="status"></p>
-                    </div><div class="hub-actions"><button id="media-dislike" class="btn btn-outline" type="button">Không thích bài này</button></div></div>
+                    </div><div class="hub-actions" data-youtube-only><button id="media-dislike" class="btn btn-outline" type="button">Không thích bài này</button></div></div>
                     <p id="media-policy-note" class="text-sm text-muted" role="status"></p>
-                    <div class="media-upcoming"><span class="eyebrow">SẮP PHÁT</span><p id="media-next-source" class="text-sm text-muted"></p><a id="media-next-link" target="_blank" rel="noopener" hidden></a><p id="media-next-empty" class="text-muted">YouTube chưa cung cấp bài tiếp theo.</p><p class="text-sm text-muted">Đề xuất có thể thay đổi khi gần hết bài. Bỏ qua sẽ chuyển theo đề xuất hiện tại.</p></div>
+                    <div class="media-upcoming" data-youtube-only><span class="eyebrow">SẮP PHÁT</span><p id="media-next-source" class="text-sm text-muted"></p><a id="media-next-link" target="_blank" rel="noopener" hidden></a><p id="media-next-empty" class="text-muted">YouTube chưa cung cấp bài tiếp theo.</p></div>
                     <p id="media-result" role="status" aria-live="polite" class="text-muted"></p>
                 </article>
-                <aside class="media-library">
-                    <section class="media-sleep"><span class="eyebrow">NGHE NHẠC RỒI NGỦ</span><h2>Hẹn giờ ngủ</h2>
+                <aside class="media-library"><section class="media-source"><h2>Chọn nội dung</h2>
+                    <div class="media-sources" role="group" aria-label="Nguồn phát"><button type="button" class="btn btn-outline" data-media-source="youtube" aria-pressed="true">YouTube</button><button type="button" class="btn btn-outline" data-media-source="spotify" aria-pressed="false">Spotify</button></div>
+                    <div id="media-spotify-account" hidden><div class="hub-actions"><span id="media-spotify-account-state" class="text-sm text-muted"></span><button id="media-spotify-login" type="button" class="btn btn-outline">Đăng nhập trên Pi</button></div><label class="media-spotify-filter"><input id="media-spotify-filter" type="checkbox" checked> Tắt tiếng quảng cáo Spotify</label></div>
+                    <label id="media-url-label" for="media-url">Link video</label><input id="media-url" type="url" maxlength="2048" placeholder="https://www.youtube.com/watch?v=…" autocomplete="off">
+                    <div class="hub-actions"><button id="media-play" class="btn btn-primary">Phát ngay</button><button id="media-enqueue" data-youtube-only class="btn btn-outline">+ Hàng đợi</button></div>
+                    <a id="media-search" href="https://www.youtube.com/" target="_blank" rel="noopener" class="btn btn-outline">Tìm video trên YouTube ↗</a>
+                    </section><section class="media-sleep"><span class="eyebrow">NGHE NHẠC RỒI NGỦ</span><h2>Hẹn giờ ngủ</h2>
                         <p id="media-sleep-note" role="status" class="text-muted">Chưa hẹn giờ.</p>
                         <form id="media-sleep-form"><label for="media-sleep-minutes">Dừng sau (phút)</label><div class="media-sleep-actions"><input id="media-sleep-minutes" type="number" min="1" max="720" step="1" required value="30"><button class="btn btn-primary" type="submit">Hẹn giờ</button><button id="media-sleep-cancel" class="btn btn-outline" type="button">Hủy hẹn giờ</button></div></form>
-                        <p class="text-sm text-muted">Giảm dần âm lượng trong 2 phút cuối rồi dừng, kể cả khi Nonstop bật. Bấm Phát để nghe tiếp sau khi hết giờ.</p>
-                    </section>
-                    <section class="media-panel media-preferences"><h2 class="panel-title">Chống lặp &amp; Bài không thích</h2>
+
+                    </section></aside>
+            </div>
+        <div class="media-settings-grid"><section data-youtube-only class="media-panel media-preferences"><h2 class="panel-title">Chống lặp &amp; Bài không thích</h2>
                         <form id="media-repeat-form"><p><label><input id="media-repeat-enabled" type="checkbox" checked> Tránh tự phát lại bài vừa nghe</label></p><label for="media-repeat-hours">Khoảng thời gian (giờ)</label><input id="media-repeat-hours" type="number" min="1" max="24" step="1" required value="3"><button class="btn btn-outline" type="submit">Lưu chống lặp</button></form>
-                        <p class="text-sm text-muted">Lịch sử trong RAM, tối đa 500 lượt; mất khi Media khởi động lại. Phát ngay bằng link vẫn cho phép nghe lại bài đã nghe.</p>
-                        <h3>Bài không thích <span id="media-disliked-count">0</span></h3><p class="text-sm text-muted">Chặn riêng trên Pi, không gửi đánh giá lên YouTube. Tối đa 200 bài, được lưu khi khởi động lại.</p><ul id="media-disliked"></ul>
-                    </section>
-                    <section class="media-panel media-volume-settings"><h2 class="panel-title">Giới hạn âm lượng theo giờ</h2>
+
+                        <h3>Bài không thích <span id="media-disliked-count">0</span></h3><ul id="media-disliked"></ul>
+                    </section><section class="media-panel media-volume-settings"><h2 class="panel-title">Giới hạn âm lượng theo giờ</h2>
                         <form id="media-limit-form">
                             <p><label><input id="media-limit-enabled" type="checkbox"> Bật giới hạn theo giờ</label></p>
                             <div class="media-limit-times"><div><label for="media-limit-start">Từ</label><input id="media-limit-start" type="time" required value="22:00"></div><div><label for="media-limit-end">Đến</label><input id="media-limit-end" type="time" required value="07:00"></div></div>
                             <label for="media-limit-value">Âm lượng tối đa (%)</label><input id="media-limit-value" type="number" min="0" max="100" step="1" required value="30">
-                            <p class="text-sm text-muted">Giờ Việt Nam (UTC+7). Chỉ áp dụng cửa sổ Media, kể cả khi Nonstop tắt. Hết khung giờ giữ nguyên âm lượng; có thể tăng lại bằng thanh kéo.</p>
+
                             <button class="btn btn-outline" type="submit">Lưu giới hạn</button>
                         </form>
-                    </section>
-                    <section class="media-source"><h2>Chọn nội dung</h2>
-                    <label for="media-url">Link video</label><input id="media-url" type="url" maxlength="2048" placeholder="https://www.youtube.com/watch?v=…" autocomplete="off">
-                    <div class="hub-actions"><button id="media-play" class="btn btn-primary">Phát ngay</button><button id="media-enqueue" class="btn btn-outline">+ Hàng đợi</button></div>
-                    <a href="https://www.youtube.com/" target="_blank" rel="noopener" class="btn btn-outline">Tìm video trên YouTube ↗</a>
-                    </section>
-                    <section class="media-panel media-queue-panel"><h2 class="panel-title">Hàng đợi · <span id="media-count">0</span></h2><div class="ops-heading"><button class="btn btn-outline" data-media="clear">Xoá hàng đợi</button></div><ol id="media-queue"></ol>
-                    <p class="text-sm text-muted">Tự chuyển bài khi video kết thúc. Hàng đợi trong RAM, mất khi khởi động lại Media. Playlist YouTube riêng có thể ảnh hưởng việc tự chuyển bài.</p>
-                    </section>
-                    <details class="media-help"><summary>Hướng dẫn &amp; Màn hình Pi</summary><p>Dùng Raspberry Pi Connect để xử lý đăng nhập, thông báo hoặc lỗi video. Media không chia sẻ các tab Chrome khác.</p><p>Đề xuất có thể thay đổi khi gần hết bài. Bỏ qua sẽ chuyển theo đề xuất hiện tại.</p><a href="https://connect.raspberrypi.com/" target="_blank" rel="noopener">Mở Raspberry Pi Connect ↗</a>
-                    <p class="text-sm text-muted">Âm thanh tiếp tục qua EasyEffects theo cấu hình desktop. Cửa sổ Media dùng hồ sơ riêng; nếu cần tài khoản YouTube, đăng nhập trực tiếp trên Pi.</p>
-                    </details>
-                </aside>
-            </div>
-        </section>
+                    </section><section data-youtube-only class="media-panel media-queue-panel"><h2 class="panel-title">Hàng đợi · <span id="media-count">0</span></h2><div class="ops-heading"><button class="btn btn-outline" data-media="clear">Xoá hàng đợi</button></div><ol id="media-queue"></ol>
+
+                    </section></div>
+</section>
         <section id="audio" class="view-section">
-            <div class="page-header"><div><span class="eyebrow">THIẾT BỊ CỦA PI</span><h1 class="page-title">Âm thanh &amp; Bluetooth</h1><p class="text-muted">Chọn loa, tai nghe và micro đang kết nối với Raspberry Pi.</p></div><button id="audio-refresh" type="button" class="btn btn-outline">Làm mới</button></div>
+            <div class="page-header"><div><h1 class="page-title">Âm thanh</h1><p class="text-muted">Chọn thiết bị và điều chỉnh âm lượng.</p></div><button id="audio-refresh" type="button" class="btn btn-outline">Làm mới</button>{{assist('audio')}}</div>
             <p id="audio-result" role="status" aria-live="polite" class="text-muted"></p>
             <div class="network-grid"><article class="card"><div class="ops-heading"><h2>Đầu ra · Loa / Tai nghe</h2></div><div id="audio-outputs"></div></article><article class="card"><div class="ops-heading"><h2>Đầu vào · Micro</h2></div><div id="audio-inputs"></div></article></div>
-            <article class="card"><div class="ops-heading"><div><h2>Bluetooth</h2><p id="audio-bt-state" class="text-muted text-sm">Đang đọc trạng thái…</p></div><div class="hub-actions"><button id="audio-bt-power" type="button" class="btn btn-outline">Bật / Tắt Bluetooth</button><button id="audio-bt-scan" type="button" class="btn btn-primary">Quét 6 giây</button></div></div><p id="audio-bt-job" role="status" class="text-sm text-muted"></p><div id="audio-bt-devices"></div><p class="text-sm text-muted">Đặt loa/tai nghe ở chế độ ghép nối → Quét → Ghép nối → Kết nối. Sau đó chọn thiết bị ở Đầu ra. Thiết bị cần PIN hoặc xác nhận có thể yêu cầu thao tác trên desktop Pi.</p></article>
-            <details class="card compact-disclosure"><summary>Lưu ý về đường âm thanh</summary><p>Đây là âm thanh của Pi, không phải micro/loa của điện thoại đang mở Dashboard. EasyEffects tiếp tục theo đầu ra mặc định. Thiết bị ảo EasyEffects được ẩn để tránh chọn nhầm vòng lặp.</p><p>Âm lượng ở đây là mức thiết bị, độc lập với âm lượng video trong Media. Giới hạn theo giờ và hẹn giờ ngủ vẫn áp dụng cho video Media. Micro chỉ xuất hiện khi có phần cứng hỗ trợ; cổng 3,5 mm của Pi không có đầu vào micro.</p><p>Ghép nối chỉ lưu trên Pi; không tự cấp tin cậy cho thiết bị mới. Trang không bật chế độ cho phép thiết bị lạ tự ghép nối.</p></details>
+            <article class="card"><div class="ops-heading"><div><h2>Bluetooth</h2><p id="audio-bt-state" class="text-muted text-sm">Đang đọc trạng thái…</p></div><div class="hub-actions"><button id="audio-bt-power" type="button" class="btn btn-outline">Bật / Tắt Bluetooth</button><button id="audio-bt-scan" type="button" class="btn btn-primary">Quét 6 giây</button></div></div><p id="audio-bt-job" role="status" class="text-sm text-muted"></p><div id="audio-bt-devices"></div></article>
+
         </section>
         <section id="apps" class="view-section">
-            <div class="page-header"><div><span class="eyebrow">MỘT NƠI ĐỂ QUẢN TRỊ</span><h1 class="page-title">Ứng dụng & Truy cập</h1><p class="text-muted">Địa chỉ hiện tại và lối vào các dự án trên Pi.</p></div><button class="btn btn-outline" id="hub-refresh" type="button">Làm mới</button></div>
+            <div class="page-header"><div><h1 class="page-title">Ứng dụng &amp; DNS</h1><p class="text-muted">Địa chỉ kết nối và các ứng dụng trên Pi.</p></div><button class="btn btn-outline" id="hub-refresh" type="button">Làm mới</button>{{assist('apps')}}</div>
             <article class="card hub-connection">
                 <div><span class="eyebrow">DNS TRONG MẠNG LAN</span><div id="hub-ip" class="hub-ip">Đang đọc IP…</div><p id="hub-network" class="text-muted"></p></div>
                 <div class="hub-actions"><button id="hub-copy-ip" class="btn btn-primary" type="button">Sao chép IP DNS</button><a class="btn btn-outline" href="https://rasp4.thinhme.tech/" target="_blank" rel="noopener">Mở qua tên miền</a></div>
-                <p class="text-sm text-muted">iPhone: Cài đặt → Wi-Fi → ⓘ → Định cấu hình DNS → Thủ công → nhập IP này. Chỉ dùng khi cùng mạng với Pi. Khi Pi mất kết nối, đổi về Tự động.</p>
-                <p id="hub-updated" class="text-xs text-muted"></p>
+
+                <button type="button" class="btn btn-ghost dns-help" data-help-page="apps">Cách cài DNS trên iPhone</button><p id="hub-updated" class="text-xs text-muted"></p>
             </article>
             <div id="hub-apps" class="network-grid hub-apps"></div>
             <section class="card visible-panel hub-diagnostic"><h2 class="panel-title">Kiểm tra DNS trên thiết bị này</h2>
-                <p class="text-muted">Mở trang này bằng chính iPhone cần thử. Phép thử gửi một tên miền ngẫu nhiên dưới example.com rồi đối chiếu trong RAM của AdGuard Home; có thể chưa xác định nếu trình duyệt chặn hoặc dùng cache.</p>
+
                 <p><span id="hub-dns-state" class="badge badge-warning">Chưa kiểm tra thiết bị này</span></p>
                 <button id="hub-dns-check" class="btn btn-outline" type="button">Kiểm tra lại thiết bị này</button><p id="hub-dns-result" role="status" aria-live="polite"></p>
-                <p class="text-sm text-muted">Windows: mở Pi Control → Bật tự động DNS. iPhone: chỉnh DNS Wi-Fi theo IP phía trên. Kết quả chỉ xác nhận đường DNS tại thời điểm thử; VPN hoặc DNS riêng của từng ứng dụng có thể đi đường khác.</p>
-                <p class="text-sm text-muted">Quảng cáo YouTube vẫn có thể xuất hiện dù DNS hoạt động. Không có dữ liệu lịch sử duyệt web hay mật khẩu được trả về trang này.</p>
+
             </section>
             <p id="hub-status" role="status" aria-live="polite" class="text-sm text-muted"></p>
         </section>
@@ -250,9 +240,9 @@
         <section id="overview" class="view-section active">
             <div class="page-header">
                 <div>
-                    <span class="eyebrow">NODE: {{hostname}}</span>
-                    <h1 class="page-title">Tổng quan hoạt động</h1>
-                    <p class="text-muted">Theo dõi tài nguyên và hiệu suất phần cứng theo thời gian thực.</p>
+
+                    <h1 class="page-title">Tổng quan</h1>
+                    <p class="text-muted">Trạng thái và tài nguyên của Raspberry Pi.</p>
                 </div>
                 <div class="health-badges">
                     <span class="badge badge-success" id="live">● Đang theo dõi</span>
@@ -261,10 +251,7 @@
                         <p id="power-detail" class="text-mono"></p>
                     </details>
                 </div>
-            </div>
-
-            <article class="card resource-mode"><div><h2>Giảm tải Media</h2><p id="resource-mode-state" class="text-muted text-sm" role="status">Đang đọc trạng thái…</p><p class="text-xs text-muted">Cho nghỉ sẽ đóng trình duyệt phát nhạc. Dashboard, Wi-Fi và AdGuard tiếp tục chạy; bật lại tại đây khi cần. Đây không phải chế độ ngủ toàn bộ Pi.</p></div><div class="hub-actions"><button class="btn btn-outline" type="button" data-media-power="off">Cho Media nghỉ</button><button class="btn btn-primary" type="button" data-media-power="on">Bật Media</button></div></article>
-            <p id="ssh-summary" class="ops-strip"></p>
+            {{assist('overview')}}</div>
 
             <div class="metrics-grid">
                 <!-- CPU -->
@@ -324,19 +311,20 @@
                     <p class="text-muted text-xs text-mono" id="swap" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);">—</p>
                 </article>
             </div>
-            
-            <p class="text-muted text-xs text-mono" id="updated" aria-live="polite" style="text-align: right;">Cập nhật chu kỳ 10 giây</p>
+
+            <article class="card resource-mode"><div><h2>Giảm tải Media</h2><p id="resource-mode-state" class="text-muted text-sm" role="status">Đang đọc trạng thái…</p></div><div class="hub-actions"><button class="btn btn-outline" type="button" data-media-power="off">Cho Media nghỉ</button><button class="btn btn-primary" type="button" data-media-power="on">Bật Media</button></div></article>
+<div class="overview-meta"><p class="text-muted text-xs text-mono" id="updated" aria-live="polite" style="text-align: right;">Cập nhật chu kỳ 10 giây</p><p id="ssh-summary" class="ops-strip"></p></div>
         </section>
 
         <!-- 2. KẾT NỐI MẠNG -->
         <section id="network" class="view-section">
             <div class="page-header">
                 <div>
-                    <span class="eyebrow">Tùy chỉnh mạng</span>
-                    <h1 class="page-title">Quản lý Kết nối</h1>
-                    <p class="text-muted">Cấu hình Wi-Fi Client và Access Point dự phòng.</p>
+
+                    <h1 class="page-title">Kết nối mạng</h1>
+                    <p class="text-muted">Wi-Fi đang dùng và mạng dự phòng.</p>
                 </div>
-            </div>
+            {{assist('network')}}</div>
 
             <div id="operation-progress" class="ops-strip" role="status" aria-live="polite" hidden></div>
 
@@ -351,11 +339,7 @@
                 </svg>
                 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
                     <p id="traffic-caption" class="text-muted text-mono text-xs"></p>
-                    <p class="text-muted text-xs">
-                        <span class="legend-rx">● Nhận (RX)</span> · 
-                        <span class="legend-tx">┄ Gửi (TX)</span> · 
-                        Khoảng trống: chưa đủ dữ liệu
-                    </p>
+
                 </div>
             </div>
 
@@ -371,7 +355,7 @@
                         </span>
                     </div>
                     <h2 style="font-size: 22px; font-weight: 600;" id="active-ssid">{{data.active_ssid or data.active or 'Không có kết nối'}}</h2>
-                    
+
                     <dl class="dl-details text-mono">
                         <dt>Địa chỉ IP</dt><dd id="network-ip">{{data.ip or '—'}}</dd>
                         <dt>Gateway</dt><dd id="network-gateway">{{data.gateway or '—'}}</dd>
@@ -391,14 +375,14 @@
                         <span class="badge {{'badge-success' if hs.configured else ''}}" id="hotspot-state">{{'Đang phát' if hs.active else ('Sẵn sàng' if hs.configured else 'Chưa cấu hình')}}</span>
                     </div>
                     <h2 style="font-size: 20px; font-weight: 600; color: var(--text-main);" id="hotspot-ssid">{{hs.ssid or 'Chưa cấu hình'}}</h2>
-                    
+
                     <dl class="dl-details text-mono">
                         <dt>Bảo mật</dt><dd id="hotspot-security">{{hs.security or '—'}}</dd>
                         <dt>Địa chỉ IP</dt><dd id="hotspot-ip">{{hs.ip or '—'}}</dd>
                         <dt>Ưu tiên</dt><dd id="hotspot-priority">{{hs.priority if hs.configured else '—'}}</dd>
                         <dt>Mật khẩu</dt><dd aria-label="Mật khẩu đã được che">{{hs.password_mask or '—'}}</dd>
                     </dl>
-                    
+
                     <form method="post" action="/hotspot" data-confirm="Bạn có chắc chắn muốn ngắt mạng hiện tại để bật Hotspot?" style="margin-top: 22px;">
                         {{token()}}
                         <button class="btn btn-outline btn-full" id="hotspot-button" {% if not hs.configured or hs.active %}disabled{% endif %}>
@@ -414,12 +398,12 @@
             <section class="card visible-panel"><h2 class="panel-title">Hồ sơ mạng đã lưu</h2>
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <div>
-                        
+
                         <p class="text-xs text-muted">Hệ thống sẽ kết nối mạng có độ ưu tiên cao nhất.</p>
                     </div>
                     <span class="badge text-mono">{{data.profiles|length}} Hồ sơ</span>
                 </div>
-                
+
                 <div class="table-wrap">
                     <table>
                         <thead>
@@ -483,7 +467,7 @@
                 <section class="card visible-panel"><h2 class="panel-title">Quét môi trường</h2>
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
                         <div>
-                            
+
                             <p class="text-xs text-muted">Tìm các điểm truy cập Wi-Fi xung quanh</p>
                         </div>
                         <button type="button" class="btn btn-outline btn-sm" id="scan">{{icon('refresh')}} Quét Wi-Fi</button>
@@ -494,7 +478,7 @@
                 </section>
 
                 <section class="card visible-panel"><h2 class="panel-title">Cấu hình thủ công</h2>
-                    
+
                     <form method="post" action="/wifi/save">
                         {{token()}}
                         <div class="form-group">
@@ -520,11 +504,11 @@
         <section id="gpio" class="view-section">
             <div class="page-header">
                 <div>
-                    <span class="eyebrow">TRA CỨU PHẦN CỨNG</span>
+
                     <h1 class="page-title">Chân cắm GPIO</h1>
-                    <p class="text-muted">Header 40 chân · Chỉ đọc, không thay đổi tín hiệu.</p>
+                    <p class="text-muted">Tra cứu 40 chân · Chế độ chỉ đọc.</p>
                 </div>
-            </div>
+            {{assist('gpio')}}</div>
 
             <div class="gpio-toolbar"><p id="gpio-status" class="gpio-status-line" role="status">Đang chờ dữ liệu GPIO</p>
 
@@ -542,7 +526,7 @@
             <div class="pinout-layout">
                 <article class="gpio-pinout-card">
                     <div class="gpio-board-heading"><div><h2>40 chân · 2 hàng × 20</h2></div><span class="badge">Chân số 1 ở đầu bên phải ↘</span></div>
-                    <p class="gpio-orientation text-muted text-xs">Từ phải sang trái: hàng trên 1–39, hàng dưới 2–40. Màu biểu thị nhóm chức năng; trạng thái thực tế xem ở phần chi tiết.</p>
+                    <p class="gpio-orientation text-muted text-xs">Chân 1 ở bên phải · Hàng trên: số lẻ · Hàng dưới: số chẵn.</p>
                     <div class="gpio-pinout-scroll" role="region" aria-label="Sơ đồ GPIO nằm ngang, cuộn ngang để xem đủ 40 chân">
                         <div class="gpio-header-assembly"><div class="gpio-board-ports" aria-hidden="true"><span>ETH</span><span>USB</span><small>PI 4</small></div><div id="gpio-board" class="gpio-board" aria-label="Chọn chân để xem thông tin"></div></div>
                     </div>
@@ -560,11 +544,11 @@
         <section id="activity" class="view-section">
             <div class="page-header">
                 <div>
-                    <span class="eyebrow">QUAN SÁT & CHẨN ĐOÁN</span>
-                    <h1 class="page-title">Sức khỏe & Lịch sử</h1>
-                    <p class="text-muted">Lịch sử nằm trong RAM và mất khi bộ giám sát khởi động lại.</p>
+
+                    <h1 class="page-title">Hoạt động</h1>
+                    <p class="text-muted">Lịch sử tài nguyên và sự kiện hệ thống.</p>
                 </div>
-            </div>
+            {{assist('activity')}}</div>
 
             <div id="power-status" class="ops-strip" role="status"></div>
 
@@ -573,7 +557,7 @@
                 <div class="ops-heading">
                     <div>
                         <h2>Lịch sử tài nguyên</h2>
-                        <p class="text-muted text-xs" style="margin-top: 2px;">CPU, RAM: % · Nhiệt độ: °C · Giá trị cao nhất trong mỗi khoảng (1 mẫu/phút, tối đa 7 ngày trong RAM).</p>
+
                     </div>
                     <select id="history-range" class="form-control text-mono" aria-label="Khoảng thời gian" style="width: auto; padding: 6px 12px;">
                         <option value="1">1 giờ</option>
@@ -598,15 +582,15 @@
             <div class="network-grid">
                 <section class="card visible-panel"><h2 class="panel-title">Chẩn đoán mạng</h2>
                     <div class="ops-heading">
-                        
+
                         <span id="diagnostics-age" class="text-xs text-muted text-mono"></span>
                     </div>
-                    <p class="text-muted text-xs" style="margin-bottom: 14px;">DNS và Internet được kiểm tra theo tuyến mặc định. Hotspot quản trị không yêu cầu Internet.</p>
+
                     <div id="network-diagnostics" class="ops-list"></div>
                 </section>
 
                 <section class="card visible-panel"><h2 class="panel-title">Lưu lượng mạng</h2>
-                    
+
                     <p class="text-muted text-xs" style="margin-bottom: 14px;">Tốc độ nhận/gửi và tổng dung lượng theo từng giao diện mạng.</p>
                     <div id="network-rates" class="ops-list"></div>
                 </section>
@@ -615,7 +599,7 @@
             <!-- Đăng nhập SSH & Tiến trình -->
             <div class="network-grid">
                 <section class="card visible-panel"><h2 class="panel-title">Đăng nhập SSH đã quan sát</h2>
-                    
+
                     <p id="ssh-coverage" class="text-muted text-xs" style="margin-bottom: 12px;"></p>
                     <div class="table-wrap ops-table-wrap">
                         <table>
@@ -635,7 +619,7 @@
 
                 <section class="card visible-panel"><h2 class="panel-title">Tiến trình dùng tài nguyên</h2>
                     <div class="ops-heading">
-                        
+
                         <span class="text-muted text-xs">CPU 100% = 1 nhân</span>
                     </div>
                     <p class="text-muted text-xs" style="margin-bottom: 12px;">Các tiến trình tiêu thụ tài nguyên cao nhất (không đọc dòng lệnh).</p>
@@ -655,12 +639,19 @@
             </div>
 
             <!-- Sự kiện gần đây -->
-            <section class="card visible-panel"><h2 class="panel-title">Sự kiện gần đây</h2>
+            <section class="card visible-panel activity-journal"><h2 class="panel-title">Nhật ký hệ thống</h2>
                 <div class="ops-heading">
-                    
+                    <p id="event-summary" class="text-muted text-xs" role="status">Đang đọc nhật ký…</p>
                     <span id="ops-updated" class="text-muted text-xs text-mono"></span>
                 </div>
+                <div class="event-filters">
+                    <label>Nguồn<select id="event-source"><option value="all">Tất cả</option><option value="storage">Ổ lưu / USB</option><option value="camera">Camera</option><option value="network">Mạng</option><option value="health">Nguồn / nhiệt / RAM</option><option value="service">Dịch vụ</option><option value="system">Hệ thống / quản trị</option></select></label>
+                    <label>Mức độ<select id="event-level"><option value="all">Tất cả</option><option value="attention">Cảnh báo và lỗi</option><option value="error">Lỗi</option><option value="info">Thông tin</option></select></label>
+                    <label class="event-search">Tìm sự kiện<input id="event-search" type="search" maxlength="120" placeholder="SSD, camera, Wi-Fi…"></label>
+                    <button id="event-refresh" type="button" class="btn btn-outline">Làm mới</button>
+                </div>
                 <div id="event-list" class="ops-list" aria-live="polite"></div>
+                <button id="event-more" type="button" class="btn btn-ghost" hidden>Xem thêm</button>
             </section>
         </section>
 
@@ -668,24 +659,24 @@
         <section id="storage" class="view-section">
             <div class="page-header">
                 <div>
-                    <span class="eyebrow">HỆ THỐNG VẬT LÝ</span>
-                    <h1 class="page-title">Lưu trữ & Dịch vụ</h1>
-                    <p class="text-muted">Quản lý phân vùng đĩa và trạng thái các service lõi.</p>
+
+                    <h1 class="page-title">Lưu trữ &amp; hệ thống</h1>
+                    <p class="text-muted">Lượng ghi ổ hệ thống và dịch vụ.</p>
                 </div>
-            </div>
+            {{assist('storage')}}</div>
 
             <article class="card storage-write-panel">
-                <div class="ops-heading"><div><h2>Lượng ghi thẻ SD</h2><p id="sd-write-device" class="text-muted text-xs">Đang đọc bộ đếm…</p></div><span class="badge">Có lưu lịch sử</span></div>
+                <div class="ops-heading"><div><h2>Lượng ghi ổ hệ thống</h2><p id="sd-write-device" class="text-muted text-xs">Đang đọc bộ đếm…</p></div><span class="badge">Có lưu lịch sử</span></div>
                 <div class="storage-write-stats">
                     <div><span class="text-muted text-xs">Tốc độ hiện tại</span><strong id="sd-write-rate">—</strong></div>
                     <div><span class="text-muted text-xs">Từ lần khởi động này</span><strong id="sd-write-boot">—</strong></div>
                     <div><span class="text-muted text-xs">Tổng từ lúc theo dõi</span><strong id="sd-write-total">—</strong></div>
                 </div>
                 <p id="sd-write-status" class="text-muted text-xs" role="status">Chưa có dữ liệu.</p>
-                <p class="text-muted text-xs">Đếm dữ liệu hệ thống gửi xuống thẻ, không phải độ mòn NAND hoặc tuổi thọ còn lại. Lịch sử bắt đầu từ khi bật tính năng.</p>
+
             </article>
             <div class="network-grid storage-write-charts">
-                <article class="card"><div class="ops-heading"><h2>Tốc độ ghi trung bình</h2><select id="sd-write-hours" aria-label="Khoảng tốc độ ghi"><option value="1">1 giờ</option><option value="24" selected>24 giờ</option><option value="168">7 ngày</option></select></div><svg id="sd-rate-chart" class="storage-write-chart" role="img" aria-label="Tốc độ ghi SD, trục thời gian và byte mỗi giây"><path id="sd-rate-path"/></svg><p id="sd-rate-note" class="text-muted text-xs"></p></article>
+                <article class="card"><div class="ops-heading"><h2>Tốc độ ghi trung bình</h2><select id="sd-write-hours" aria-label="Khoảng tốc độ ghi"><option value="1">1 giờ</option><option value="24" selected>24 giờ</option><option value="168">7 ngày</option></select></div><svg id="sd-rate-chart" class="storage-write-chart" role="img" aria-label="Tốc độ ghi ổ hệ thống, trục thời gian và byte mỗi giây"><path id="sd-rate-path"/></svg><p id="sd-rate-note" class="text-muted text-xs"></p></article>
                 <article class="card"><div class="ops-heading"><h2>Lượng ghi theo ngày</h2><select id="sd-write-days" aria-label="Khoảng lịch sử ghi"><option value="30">30 ngày</option><option value="90">90 ngày</option><option value="0">Toàn bộ</option></select></div><svg id="sd-daily-chart" class="storage-write-chart" role="img" aria-label="Dung lượng ghi theo ngày, trục thời gian và dung lượng"><g id="sd-daily-bars"/></svg><p id="sd-daily-note" class="text-muted text-xs"></p></article>
             </div>
 
@@ -695,7 +686,7 @@
                         <h2>Quản lý dịch vụ</h2>
                         <span class="text-muted text-xs">Chỉ các dịch vụ của dashboard</span>
                     </div>
-                    <p class="text-muted text-xs" style="margin-bottom: 16px;">Khởi động lại các thành phần điều khiển và giám sát mạng khi cần.</p>
+                    <p class="text-muted text-xs" style="margin-bottom: 16px;">Khởi động lại các thành phần điều khiển và giám sát mạng khi cần. Trợ giúp giải thích chức năng và ảnh hưởng của từng service.</p>
                     <div class="ops-actions" style="margin-bottom: 0;">
                         {% for unit,label in [('piwifi-web','Khởi động lại dashboard'),('piwifi-observer','Khởi động lại bộ giám sát'),('piwifi-guard.timer','Khởi động lại lịch fallback')] %}
                         <form method="post" action="/service/restart" data-confirm="{{label}}?">
@@ -705,13 +696,19 @@
                         </form>
                         {% endfor %}
                     </div>
+                    <div class="service-help-list">
+                    {% for service in service_help_rows %}
+                        <div class="service-help-item"><div><strong>{{service.label}}</strong><code>{{service.unit}}</code></div><button type="button" class="btn btn-outline btn-sm" data-service-help="{{service.id}}">Trợ giúp</button></div>
+                        <dialog class="service-help-dialog" id="service-help-{{service.id}}" aria-labelledby="service-title-{{service.id}}"><h3 id="service-title-{{service.id}}">{{service.label}}</h3><p><code>{{service.unit}}</code> · {{'Phiên người dùng' if service.scope=='user' else 'Hệ thống'}}</p><dl><dt>Chức năng</dt><dd>{{service.purpose}}</dd><dt>Khi dừng / khởi động lại</dt><dd>{{service.stop_impact}}</dd><dt>Trạng thái không chạy</dt><dd>{{service.normal_inactive}}</dd><dt>Phụ thuộc</dt><dd>{{service.dependencies|join(', ') or 'Không có phụ thuộc ứng dụng khác'}}</dd></dl><button type="button" class="btn btn-primary" data-service-close>Đóng</button></dialog>
+                    {% endfor %}
+                    </div>
                 </article>
 
                 <section class="card visible-panel"><h2 class="panel-title">Bản triển khai &amp; Phục hồi</h2>
-                    
+
                     <div id="deployment-info" class="ops-list"></div>
                     <div class="restore-actions">
-                        <p class="text-xs text-muted">Phục hồi mã nguồn và dịch vụ của bản trước. Gói hệ thống, DB cũ và profile Wi-Fi được giữ nguyên. Lịch sử RAM mất khi bộ giám sát khởi động lại.</p>
+
                         <form method="post" action="/deploy/rollback" data-confirm="Phục hồi bản trước? Dashboard sẽ khởi động lại; các tính năng mới có thể mất.">
                             {{token()}}
                             <button class="btn btn-danger btn-sm" id="rollback-button" disabled>Phục hồi bản trước</button>
@@ -719,31 +716,36 @@
                     </div>
                 </section>
             </div>
-            
+
             <div class="network-grid">
                 <article class="card">
                     <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 16px;">Phân vùng lưu trữ</h3>
                     <div id="disks" class="text-sm text-muted">Hệ thống đang truy xuất dữ liệu đĩa...</div>
                 </article>
                 <section class="card visible-panel"><h2 class="panel-title">Tiến trình hệ thống (Services)</h2>
-                    
+
                     <div id="services" class="text-sm text-muted">Đang tải danh sách dịch vụ...</div>
                 </section>
             </div>
         </section>
-        
+
     </main>
 </div>
 
 <!-- Cấp phát dữ liệu ban đầu và script backend (Giữ nguyên 100%) -->
 <script id="initial-metrics" type="application/json">{{metrics|tojson}}</script>
 <script id="initial-network" type="application/json">{{data|tojson}}</script>
+{% include 'help.html' %}
+<script src="{{url_for('static',filename='interface.js',v=asset_version)}}" defer></script>
+<script src="{{url_for('static',filename='service-help.js',v=asset_version)}}" defer></script>
 <script src="{{url_for('static',filename='dashboard.js',v=asset_version)}}" defer></script>
 <script src="{{url_for('static',filename='charts.js',v=asset_version)}}" defer></script>
 <script src="{{url_for('static',filename='hardware.js',v=asset_version)}}" defer></script>
 <script src="{{url_for('static',filename='hub.js',v=asset_version)}}" defer></script>
 <script src="{{url_for('static',filename='media.js',v=asset_version)}}" defer></script>
 <script src="{{url_for('static',filename='audio.js',v=asset_version)}}" defer></script>
+<link rel="stylesheet" href="{{url_for('static',filename='camera.css',v=asset_version)}}">
+<script src="{{url_for('static',filename='camera.js',v=asset_version)}}" defer></script>
 <input type="hidden" id="ops-csrf" value="{{csrf}}">
 <script src="{{url_for('static',filename='operations.js',v=asset_version)}}" defer></script>
 <script src="{{url_for('static',filename='storage-writes.js',v=asset_version)}}" defer></script>

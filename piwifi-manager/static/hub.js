@@ -1,6 +1,7 @@
 (() => {
   'use strict';
   const $=id=>document.getElementById(id);
+ function feedback(text,tone='info'){if(window.PiUI)window.PiUI.feedback('hub-status',text,tone);else $('hub-status').textContent=text;}
   if(!$('hub-apps'))return;
   let currentIP='', busy=false, timer, checkBusy=false, checkedNetwork=null, autoChecked=false;
   const visible=()=>!document.hidden&&$('apps').classList.contains('active');
@@ -15,7 +16,7 @@
       const input=document.createElement('textarea');input.value=value;document.body.append(input);input.select();
       const ok=document.execCommand('copy');input.remove();if(!ok)throw Error('Không sao chép được; chọn địa chỉ IP hiển thị để sao chép thủ công.');
     }
-    $('hub-status').textContent='Đã sao chép '+value;
+    feedback('Đã sao chép '+value,'success');
   }
   function link(parent,label,url){const a=document.createElement('a');a.className='btn btn-outline';a.textContent=label;a.href=url;a.target='_blank';a.rel='noopener';parent.append(a);}
   async function refresh(){
@@ -31,7 +32,7 @@
       checkedNetwork=networkKey;
       $('hub-ip').textContent=currentIP||'Chưa có IP LAN';$('hub-copy-ip').disabled=!currentIP;
       $('hub-network').textContent=(d.ssid||'Chưa kết nối')+' · '+d.hostname;
-      $('hub-updated').textContent='Đọc từ Pi lúc '+new Date(d.updated*1000).toLocaleTimeString('vi-VN')+' · tự làm mới khi mục này đang mở';
+      $('hub-updated').textContent='Cập nhật '+new Date(d.updated*1000).toLocaleTimeString('vi-VN');
       $('hub-apps').replaceChildren();
       d.apps.forEach(item=>{
         const card=document.createElement('article');card.className='card hub-app';
@@ -43,12 +44,12 @@
         if(item.public_url)link(actions,'Mở qua tên miền',item.public_url);
         if(item.loopback){const note=document.createElement('p');note.className='text-sm';note.textContent='Mở qua nút Camera trên Pi Control của Windows.';actions.append(note);}
         card.append(state,title,desc,actions);$('hub-apps').append(card);
-      });$('hub-status').textContent='Đã cập nhật kết nối. Tên miền dashboard vẫn dùng được khi IP LAN thay đổi và Pi có Internet.';
-    }catch(e){currentIP='';$('hub-copy-ip').disabled=true;$('hub-status').textContent='Dữ liệu có thể đã cũ: '+e.message;}
+      });if($('hub-status').dataset.tone==='error')feedback('');
+    }catch(e){currentIP='';$('hub-copy-ip').disabled=true;feedback('Chưa cập nhật được kết nối: '+e.message,'error');}
     finally{busy=false;$('hub-refresh').disabled=false;}
   }
   $('hub-refresh').onclick=refresh;
-  $('hub-copy-ip').onclick=()=>copy(currentIP).catch(e=>$('hub-status').textContent=e.message);
+  $('hub-copy-ip').onclick=()=>copy(currentIP).catch(e=>feedback(e.message,'error'));
   async function checkDNS(){
     if(checkBusy)return;checkBusy=true;$('hub-dns-check').disabled=true;
     $('hub-dns-result').textContent='Đang gửi truy vấn thử…';
@@ -63,10 +64,10 @@
         await new Promise(resolve=>setTimeout(resolve,2000));
         result=await api('/api/dns-check');if(result.seen)break;
       }
-      const labels={verified:'Đã xác nhận dùng AdGuard và chặn được mẫu thử',filter_error:'Đã qua AdGuard — mẫu thử chưa được chặn',unconfirmed:'Chưa xác nhận thiết bị đang dùng AdGuard'};
+      const labels={verified:'Đang dùng AdGuard · Chặn mẫu thử thành công',filter_error:'Đã qua AdGuard · Mẫu thử chưa được chặn',unconfirmed:'Chưa xác nhận dùng AdGuard'};
       $('hub-dns-state').textContent=labels[result.status]||labels.unconfirmed;
       $('hub-dns-state').className='badge '+(result.status==='verified'?'badge-success':'badge-warning');
-      $('hub-dns-result').textContent=result.message+' '+(result.filtering?'Bộ lọc trên Pi hoạt động.':'Bộ lọc trên Pi chưa chặn tên miền kiểm tra.')+' Kiểm tra lúc '+new Date(result.checked_at*1000).toLocaleTimeString('vi-VN');
+      $('hub-dns-result').textContent=result.message+' · '+new Date(result.checked_at*1000).toLocaleTimeString('vi-VN');
     }catch(e){$('hub-dns-result').textContent=e.message;$('hub-dns-state').textContent='Chưa kiểm tra được';$('hub-dns-state').className='badge badge-warning';}
     finally{if(image)image.src='';checkBusy=false;$('hub-dns-check').disabled=false;}
   }

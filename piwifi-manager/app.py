@@ -7,6 +7,8 @@ from flask import (
     session,
     flash,
     jsonify,
+    Response,
+    send_file,
 )
 
 import subprocess
@@ -18,11 +20,17 @@ import socket
 import time
 from copy import deepcopy
 from pathlib import Path
-from observer import current as collect, history, events, ipc_read
+from observer import current as collect, history, events, activity, ipc_read
 from state import read as read_state
 from hardware import status as gpio_status
 import hub
 import media
+import camera
+import audio_client
+from service_catalog import help_rows
+import base64
+import hashlib
+import re
 
 
 app = Flask(__name__)
@@ -33,6 +41,11 @@ app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
 )
+
+
+@app.context_processor
+def service_help_context():
+    return {'service_help_rows':help_rows()}
 
 WEB_USER = os.environ.get("PIWIFI_USER", "admin")
 WEB_PASS = os.environ.get("PIWIFI_PASS", "")
@@ -107,6 +120,8 @@ def api_storage_writes():
 
 @app.route('/api/events')
 def api_events():
+    if request.args.get('summary')=='1':
+        return jsonify(ok=True,data=cached_read('activity',10,activity))
     return jsonify(ok=True, data=cached_read('events', 10, events))
 
 @app.route('/api/operation')
@@ -204,9 +219,68 @@ def api_audio():
         return jsonify(ok=False,error='Phiên không hợp lệ'),403
     payload=request.get_json(silent=True) if request.method=='POST' else {'action':'status'}
     if not isinstance(payload,dict):return jsonify(ok=False,error='Yêu cầu không hợp lệ'),400
-    try:return jsonify(ok=True,data=media.call({'action':'audio','payload':payload}))
+    try:return jsonify(ok=True,data=audio_client.call(payload))
     except ValueError as exc:return jsonify(ok=False,error=str(exc)),400
     except (OSError,RuntimeError):return jsonify(ok=False,error='Âm thanh chưa sẵn sàng; kiểm tra phiên desktop Pi.'),503
+
+
+@app.route('/api/camera', methods=['GET','POST'])
+def api_camera():
+    if request.method == 'POST':
+        try: check_csrf()
+        except RuntimeError: return jsonify(ok=False,error='Phiên không hợp lệ'),403
+    payload = request.get_json(silent=True) if request.method == 'POST' else {'action':'status'}
+    if not isinstance(payload,dict) or payload.get('action') not in (
+            'status','power','calibrate','start','stop','list','delete','freeze','render','watch','automatic','storage'):
+        return jsonify(ok=False,error='Yêu cầu camera không hợp lệ'),400
+    if payload.get('action')=='watch':
+        viewer=payload.get('viewer')
+        if not isinstance(viewer,str) or not re.fullmatch('[a-f0-9]{32}',viewer):
+            return jsonify(ok=False,error='Phiên xem không hợp lệ'),400
+        payload=dict(payload,viewer=hashlib.sha256((session['csrf']+':'+viewer).encode()).hexdigest())
+    try: return jsonify(ok=True,data=camera.call(payload))
+    except ValueError as exc: return jsonify(ok=False,error=str(exc)),400
+    except (OSError,RuntimeError): return jsonify(ok=False,error='Camera chưa sẵn sàng; kiểm tra dịch vụ pi-camera.'),503
+
+
+@app.route('/api/camera/frame')
+def camera_frame():
+    try:
+        frame = base64.b64decode(camera.call({'action':'frame'})['jpeg'],validate=True)
+        return Response(frame,mimetype='image/jpeg',headers={'X-Content-Type-Options':'nosniff'})
+    except ValueError: return Response(status=503)
+    except (OSError,RuntimeError): return Response(status=503)
+
+
+@app.route('/api/camera/video/<ident>')
+def camera_video(ident):
+    try:
+        result = camera.call({'action':'download','id':ident,'storage':request.args.get('storage','ram')})
+        return send_file(result['path'],as_attachment=True,download_name=f'{ident}.mp4')
+    except ValueError as exc: return jsonify(ok=False,error=str(exc)),400
+    except (OSError,RuntimeError): return jsonify(ok=False,error='Video chưa sẵn sàng'),503
+
+
+@app.route('/api/camera/photos/<ident>')
+def camera_photos(ident):
+    try:
+        result = camera.call({'action':'photos','id':ident,'storage':request.args.get('storage','ram')})
+        return jsonify(ok=True,data=result)
+    except ValueError as exc: return jsonify(ok=False,error=str(exc)),400
+    except (OSError,RuntimeError): return jsonify(ok=False,error='Không đọc được ảnh của phiên'),503
+
+
+@app.route('/api/camera/photo/<ident>/<int:index>')
+def camera_photo(ident,index):
+    try:
+        result = camera.call({'action':'photo','id':ident,'index':index,'storage':request.args.get('storage','ram')})
+        jpeg = base64.b64decode(result['jpeg'],validate=True)
+        disposition = 'attachment' if request.args.get('download') == '1' else 'inline'
+        return Response(jpeg,mimetype='image/jpeg',headers={
+            'X-Content-Type-Options':'nosniff',
+            'Content-Disposition':f'{disposition}; filename="{ident}-frame-{index:06d}.jpg"'})
+    except ValueError as exc: return jsonify(ok=False,error=str(exc)),400
+    except (OSError,RuntimeError): return jsonify(ok=False,error='Ảnh không còn trên ổ lưu'),503
 
 
 @app.route("/login", methods=["GET", "POST"])
