@@ -193,6 +193,19 @@
       "bundle": "pi-control-ssd-20261027-r3",
       "manifest_sha256": "51b2071944481311d25b4a0a308736077f4edd7f68f61d3c58121714c7addb6a",
       "files": 5
+    },
+    {
+      "kind": "module-payload",
+      "timestamp": 1793088570,
+      "date": "2026-10-27T15:09:30+07:00",
+      "title": "feat(history): Recover dns v1-29bdb237f185af9f",
+      "event_id": "0c414fb8aaef47a49a94418ffd706174",
+      "module": "dns",
+      "release": "v1-29bdb237f185af9f",
+      "source_hash": "29bdb237f185af9fd3e1135a6c9191512e1b060606c35c849daa11a1c9bcb5b6",
+      "bundle": "pi-control-ssd-20261027-r3",
+      "manifest_sha256": "51b2071944481311d25b4a0a308736077f4edd7f68f61d3c58121714c7addb6a",
+      "files": 4
     }
   ]
 }
