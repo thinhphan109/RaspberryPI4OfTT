@@ -115,6 +115,19 @@
       "bundle": "pi-control-ssd-20261027-r3",
       "manifest_sha256": "51b2071944481311d25b4a0a308736077f4edd7f68f61d3c58121714c7addb6a",
       "files": 9
+    },
+    {
+      "kind": "module-payload",
+      "timestamp": 1793088560,
+      "date": "2026-10-27T15:09:20+07:00",
+      "title": "feat(history): Recover observer v1-f70dec803a4f0743",
+      "event_id": "7255eff2bf59472194ceb99a71068cc0",
+      "module": "observer",
+      "release": "v1-f70dec803a4f0743",
+      "source_hash": "f70dec803a4f07434e17d946924316ad0708e2974431fea4c9ca012eb5fabc2a",
+      "bundle": "pi-control-ssd-20261027-r3",
+      "manifest_sha256": "51b2071944481311d25b4a0a308736077f4edd7f68f61d3c58121714c7addb6a",
+      "files": 8
     }
   ]
 }

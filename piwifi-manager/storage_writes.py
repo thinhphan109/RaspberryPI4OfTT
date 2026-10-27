@@ -7,16 +7,19 @@ import hashlib
 import json
 import math
 import os
+import re
 from pathlib import Path
 import sqlite3
 import threading
 import time
+from runtime_config import CONFIG as RUNTIME_CONFIG, modular
 
 CHECKPOINT_SECONDS = 300
 DAY_OFFSET = 7 * 3600  # Calendar days in Vietnam, independent of host timezone.
 
 
 def system_sample():
+    if modular():return os_disk_sample()
     root = Path('/sys/block/mmcblk0')
     cid = (root / 'device/cid').read_text().strip()
     if not cid:
@@ -28,6 +31,28 @@ def system_sample():
                 counter=int(values[6]) * 512,
                 uptime=float(Path('/proc/uptime').read_text().split()[0]),
                 timestamp=time.time())
+
+
+def os_disk_sample(sysroot=Path('/sys'),procroot=Path('/proc')):
+    """Track the physical disk behind /, not a hardcoded SD or data partition."""
+    rows=(procroot/'1/mountinfo').read_text().splitlines()
+    row=next((r.split(' - ',1)[0].split() for r in rows if r.split(' - ',1)[0].split()[4]=='/'),None)
+    if not row or not re.fullmatch(r'\d+:\d+',row[2]):raise ValueError('Không xác định được ổ hệ thống')
+    device=(sysroot/'dev/block'/row[2]).resolve(strict=True)
+    if (device/'partition').exists():device=device.parent
+    name=device.name
+    if not re.fullmatch(r'(?:sd[a-z]+|mmcblk\d+|nvme\d+n\d+|vd[a-z]+)',name):raise ValueError('Loại ổ hệ thống chưa được hỗ trợ')
+    identity=RUNTIME_CONFIG['root_uuid']
+    model=''
+    for candidate in ('device/model','device/name','device/../model'):
+        try:model=(device/candidate).read_text().strip()
+        except OSError:continue
+        if model:break
+    fields=(device/'stat').read_text().split()
+    if len(fields)<7:raise ValueError('Chưa đọc được bộ đếm ghi ổ hệ thống')
+    return dict(device=hashlib.sha256(('rootfs:'+identity).encode()).hexdigest(),name=name,
+                model=model or name,boot=(procroot/'sys/kernel/random/boot_id').read_text().strip(),
+                counter=int(fields[6])*512,uptime=float((procroot/'uptime').read_text().split()[0]),timestamp=time.time())
 
 
 class WriteTracker:

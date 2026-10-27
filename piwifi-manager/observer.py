@@ -14,13 +14,16 @@ import threading
 import socketserver
 from security import status as security_status
 from storage_writes import WriteTracker, system_sample
+from system_events import SystemMonitor
+from runtime_config import location, modular
 
 SAMPLES = deque(maxlen=10080)
 HEALTH_EVENTS = deque(maxlen=500)
 RAM_LOCK = threading.Lock()
-IPC = Path('/run/piwifi-observer/history.sock')
+IPC = location('observer_run','/run/piwifi-observer')/'history.sock'
 WRITE_TRACKER = None
 WRITE_ERROR = ''
+JOURNAL = None
 
 def bucket_history(rows):
     size = max(1, (len(rows)+359)//360)
@@ -35,6 +38,10 @@ def bucket_history(rows):
     return result
 
 def ram_query(kind,hours=24,days=30):
+    if kind=='activity':
+        return JOURNAL.store.snapshot() if JOURNAL else dict(events=list(HEALTH_EVENTS),meta=dict(available=False,error='Nhật ký mở rộng chưa sẵn sàng'))
+    if kind=='events' and JOURNAL:
+        return JOURNAL.store.snapshot()['events']
     if kind=='storage-writes':
         if WRITE_TRACKER:
             try:result=WRITE_TRACKER.query(hours,days)
@@ -73,7 +80,7 @@ class RamServer(getattr(socketserver, 'UnixStreamServer', socketserver.TCPServer
 
 
 DB = Path(os.environ.get('PIWIFI_HISTORY_DB', '/var/lib/piwifi-observer/history.db'))
-SNAPSHOT = Path('/run/piwifi-observer/metrics.json')
+SNAPSHOT = location('observer_run','/run/piwifi-observer')/'metrics.json'
 
 @contextmanager
 def connect():
@@ -102,8 +109,25 @@ def history(hours=24):
     return ipc_read('history',hours)
 
 def events():
-    result=read('events.json',[]) + ipc_read('events')
+    result=control_events() + ipc_read('events')
     return sorted(result,key=lambda e:e['timestamp'],reverse=True)[:200]
+
+
+def activity():
+    payload=ipc_read('activity')
+    if not isinstance(payload,dict):
+        payload=dict(events=[],meta=dict(available=False,error='Chưa kết nối được bộ thu nhật ký'))
+    rows=control_events() + payload.get('events',[])
+    payload['events']=sorted(rows,key=lambda e:e['timestamp'],reverse=True)[:400]
+    return payload
+
+
+def control_events():
+    rows=read('events.json',[])
+    if modular():
+        saved=read('deploy-history.json',{'events':[]})
+        if isinstance(saved,dict) and isinstance(saved.get('events'),list):rows+=saved['events'][-400:]
+    return rows
 
 def current():
     try:
@@ -190,6 +214,8 @@ def _run():
                     checks = dict(timestamp=now, layers=[], error='Chưa chẩn đoán được mạng')
                 last_diagnose = now
             data['diagnostics'] = checks
+            if JOURNAL:
+                JOURNAL.observe_health(data,checks)
             data['ssh_security'] = security_status()
             temporary = SNAPSHOT.with_suffix('.tmp')
             temporary.write_text(json.dumps(data, ensure_ascii=False), encoding='utf-8')
@@ -212,7 +238,8 @@ def _run():
                     SAMPLES.append(dict(timestamp=now,**sample))
                     for flag,value in flags.items():
                         if value is not None and value!=previous.get(flag,False):
-                            HEALTH_EVENTS.append(dict(timestamp=now,message=labels[flag] if value else labels[flag]+' · đã hết cảnh báo',level='warning' if value else 'info',kind='health'))
+                            if not JOURNAL:
+                                HEALTH_EVENTS.append(dict(timestamp=now,message=labels[flag] if value else labels[flag]+' · đã hết cảnh báo',level='warning' if value else 'info',kind='health'))
                 previous=flags
                 last_save=now
         except Exception as exc:
@@ -221,7 +248,7 @@ def _run():
         time.sleep(max(1, 10 - (time.monotonic() - started)))
 
 def run():
-    global WRITE_TRACKER,WRITE_ERROR
+    global WRITE_TRACKER,WRITE_ERROR,JOURNAL
     import signal
     def stop(signum, frame):
         raise KeyboardInterrupt
@@ -232,8 +259,10 @@ def run():
         raise RuntimeError('/run is not tmpfs')
     IPC.parent.mkdir(parents=True,exist_ok=True)
     IPC.unlink(missing_ok=True)
+    JOURNAL=SystemMonitor(location('observer_state','/var/lib/piwifi-observer')/'system-events.json')
+    JOURNAL.start()
     try:
-        WRITE_TRACKER=WriteTracker('/var/lib/piwifi-observer/storage-writes.db')
+        WRITE_TRACKER=WriteTracker(location('observer_state','/var/lib/piwifi-observer')/'storage-writes.db')
     except Exception:
         WRITE_ERROR='Không mở được cơ sở dữ liệu lượng ghi; dữ liệu cũ được giữ nguyên'
     with RamServer(str(IPC),RamHandler) as server:
@@ -244,6 +273,7 @@ def run():
         except KeyboardInterrupt: pass
         finally:
             server.shutdown()
+            JOURNAL.close()
             if WRITE_TRACKER:
                 try:
                     WRITE_TRACKER.sample(system_sample())

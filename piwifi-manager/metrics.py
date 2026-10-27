@@ -7,6 +7,7 @@ import threading
 import time
 import json
 from pathlib import Path
+from runtime_config import unit as runtime_unit
 
 _lock = threading.Lock()
 _last = None
@@ -138,7 +139,7 @@ def service_states():
     services = []
     for unit in ('piwifi-web', 'NetworkManager', 'ssh', 'piwifi-guard.timer', 'piwifi-observer'):
         try:
-            p = subprocess.run(['systemctl', 'is-active', unit], capture_output=True, text=True, timeout=2)
+            p = subprocess.run(['systemctl', 'is-active', runtime_unit(unit)], capture_output=True, text=True, timeout=2)
             state = p.stdout.strip() or 'unknown'
         except (OSError, subprocess.TimeoutExpired): state = 'unknown'
         services.append(dict(name=unit, state=state))
