@@ -36,6 +36,8 @@
  }
  function render(d){
   provider=d.provider==='spotify'?'spotify':'youtube';spotifyState=d;
+  if($('media-quality')&&document.activeElement!==$('media-quality'))$('media-quality').value=d.youtube_quality||'240';
+  if($('media-quality-note'))$('media-quality-note').textContent=d.video_height?'Đang giải mã '+d.video_height+'p · YouTube có thể tự điều chỉnh.':'Ưu tiên độ phân giải thấp khi nghe nhạc.';
   $('media').dataset.provider=provider;
   standby=!!d.standby;connected=!!d.connected;powerControls();
   shortcuts(d.shortcuts);powerControls();
@@ -111,6 +113,8 @@
  $('media-spotify-login').onclick=()=>command({action:'spotify_login'});
  $('media-spotify-filter').onchange=()=>command({action:'spotify_filter',enabled:$('media-spotify-filter').checked});
  $('media-bt-guard').onchange=()=>command({action:'bluetooth_guard',enabled:$('media-bt-guard').checked});
+ if($('media-quality'))$('media-quality').onchange=()=>command({action:'youtube_quality',value:$('media-quality').value});
+ window.PiMedia={command};
  $('media-shortcut-form').onsubmit=async e=>{e.preventDefault();const result=await command({action:'shortcut_save',provider,url:$('media-url').value.trim(),label:$('media-shortcut-label').value.trim()});if(result)$('media-shortcut-label').value=''};
  $('media-nonstop').onclick=()=>command({action:'nonstop',enabled:!nonstop});
  $('media-dislike').onclick=()=>command({action:'dislike'});

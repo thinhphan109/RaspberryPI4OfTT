@@ -164,6 +164,10 @@
         {% include 'camera.html' %}
         <section id="media" class="view-section">
             <div class="page-header"><div><h1 class="page-title">Media</h1><p class="text-muted">Điều khiển nhạc phát trên loa của Pi.</p></div><div class="hub-actions"><button id="media-start" class="btn btn-outline" type="button">Bật Media</button><button class="btn btn-outline" type="button" data-media-power="off">Cho Media nghỉ</button></div>{{assist('media')}}</div>
+            <section class="card media-catalog" aria-label="Tìm nhạc">
+                <form id="catalog-form" class="catalog-search"><label class="sr-only" for="catalog-provider">Nguồn tìm</label><select id="catalog-provider"><option value="spotify">Spotify</option><option value="youtube">YouTube</option></select><label class="sr-only" for="catalog-query">Từ khóa</label><input id="catalog-query" type="search" maxlength="120" required placeholder="Tìm bài hát, nghệ sĩ, playlist…" autocomplete="off"><button id="catalog-submit" type="submit" class="btn btn-primary">Tìm nhạc</button></form>
+                <p id="catalog-note" class="text-xs text-muted" role="status">Kết quả từ trình duyệt trên Pi · không cần API key.</p><ul id="catalog-results" aria-label="Kết quả tìm nhạc"></ul>
+            </section>
             <div class="media-layout">
                 <article class="media-player">
                     <div class="media-topline">
@@ -181,6 +185,7 @@
                     <p id="media-limit-note" class="text-sm text-muted" role="status"></p>
                     </div><div class="hub-actions" data-youtube-only><button id="media-dislike" class="btn btn-outline" type="button">Không thích bài này</button></div></div>
                     <p id="media-policy-note" class="text-sm text-muted" role="status"></p>
+                    <div class="media-quality" data-youtube-only><label for="media-quality">Chất lượng YouTube</label><select id="media-quality"><option value="240">Nghe nền · ưu tiên 240p</option><option value="360">Xem nhẹ · ưu tiên 360p</option><option value="auto">Tự động</option></select><p id="media-quality-note" class="text-xs text-muted"></p></div>
                     <div class="media-output-guard"><label><input id="media-bt-guard" type="checkbox" checked> Tạm dừng khi mất loa Bluetooth</label><p id="media-bt-guard-state" class="text-sm text-muted" role="status"></p></div>
                     <div class="media-upcoming" data-youtube-only><span class="eyebrow">SẮP PHÁT</span><p id="media-next-source" class="text-sm text-muted"></p><a id="media-next-link" target="_blank" rel="noopener" hidden></a><p id="media-next-empty" class="text-muted">YouTube chưa cung cấp bài tiếp theo.</p></div>
                     <p id="media-result" role="status" aria-live="polite" class="text-muted"></p>
@@ -684,6 +689,26 @@
 
             <div class="network-grid">
                 <article class="card">
+                    <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 16px;">Phân vùng lưu trữ</h3>
+                    <div id="disks" class="text-sm text-muted">Hệ thống đang truy xuất dữ liệu đĩa...</div>
+                </article>
+                <section class="card visible-panel"><h2 class="panel-title">Trạng thái dịch vụ</h2>
+
+                    <div id="services" class="text-sm text-muted">Đang tải danh sách dịch vụ...</div>
+                </section>
+            </div>
+                <section class="card visible-panel deployment-panel"><h2 class="panel-title">Bản triển khai &amp; Phục hồi</h2>
+
+                    <div id="deployment-info" class="ops-list"></div>
+                    <div class="restore-actions">
+
+                        <form method="post" action="/deploy/rollback" data-confirm="Phục hồi bản trước? Dashboard sẽ khởi động lại; các tính năng mới có thể mất.">
+                            {{token()}}
+                            <button class="btn btn-danger btn-sm" id="rollback-button" disabled>Phục hồi bản trước</button>
+                        </form>
+                    </div>
+                </section>
+                <article class="card service-management">
                     <div class="ops-heading">
                         <h2>Quản lý dịch vụ</h2>
                         <span class="text-muted text-xs">Chỉ các dịch vụ của dashboard</span>
@@ -706,34 +731,13 @@
                     </div>
                 </article>
 
-                <section class="card visible-panel"><h2 class="panel-title">Bản triển khai &amp; Phục hồi</h2>
-
-                    <div id="deployment-info" class="ops-list"></div>
-                    <div class="restore-actions">
-
-                        <form method="post" action="/deploy/rollback" data-confirm="Phục hồi bản trước? Dashboard sẽ khởi động lại; các tính năng mới có thể mất.">
-                            {{token()}}
-                            <button class="btn btn-danger btn-sm" id="rollback-button" disabled>Phục hồi bản trước</button>
-                        </form>
-                    </div>
-                </section>
-            </div>
-
-            <div class="network-grid">
-                <article class="card">
-                    <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 16px;">Phân vùng lưu trữ</h3>
-                    <div id="disks" class="text-sm text-muted">Hệ thống đang truy xuất dữ liệu đĩa...</div>
-                </article>
-                <section class="card visible-panel"><h2 class="panel-title">Tiến trình hệ thống (Services)</h2>
-
-                    <div id="services" class="text-sm text-muted">Đang tải danh sách dịch vụ...</div>
-                </section>
-            </div>
         </section>
 
     </main>
 </div>
 
+<button id="quick-audio-open" type="button" class="btn quick-audio-launch" aria-label="Điều chỉnh âm lượng loa" aria-haspopup="dialog">{{icon('headphones')}}<span>Loa</span></button>
+<dialog id="quick-audio" class="quick-audio-dialog" aria-labelledby="quick-audio-title"><div class="ops-heading"><h2 id="quick-audio-title">Âm lượng loa</h2><button id="quick-audio-close" type="button" class="btn btn-ghost" aria-label="Đóng">×</button></div><p id="quick-audio-name" class="text-sm">Đang đọc đầu ra…</p><label for="quick-audio-volume">Âm lượng hệ thống <strong id="quick-audio-value">—</strong></label><input id="quick-audio-volume" type="range" min="0" max="100" value="0" disabled><div class="hub-actions"><button id="quick-audio-mute" type="button" class="btn btn-outline" disabled>Tắt tiếng</button><a id="quick-audio-settings" href="#audio" class="btn btn-ghost">Chọn loa ↗</a></div><p id="quick-audio-note" class="text-xs text-muted" role="status"></p></dialog>
 <!-- Cấp phát dữ liệu ban đầu và script backend (Giữ nguyên 100%) -->
 <script id="initial-metrics" type="application/json">{{metrics|tojson}}</script>
 <script id="initial-network" type="application/json">{{data|tojson}}</script>
@@ -746,6 +750,8 @@
 <script src="{{url_for('static',filename='hub.js',v=asset_version)}}" defer></script>
 <script src="{{url_for('static',filename='media.js',v=asset_version)}}" defer></script>
 <script src="{{url_for('static',filename='audio.js',v=asset_version)}}" defer></script>
+<script src="{{url_for('static',filename='quick-audio.js',v=asset_version)}}" defer></script>
+<script src="{{url_for('static',filename='media-library.js',v=asset_version)}}" defer></script>
 <link rel="stylesheet" href="{{url_for('static',filename='camera.css',v=asset_version)}}">
 <script src="{{url_for('static',filename='camera.js',v=asset_version)}}" defer></script>
 <input type="hidden" id="ops-csrf" value="{{csrf}}">

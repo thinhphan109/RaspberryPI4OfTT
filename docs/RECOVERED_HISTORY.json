@@ -349,6 +349,19 @@
       "bundle": "pi-control-ssd-20261028-r6b",
       "manifest_sha256": "b6d07a9e056bf333f5bf763c06457f84ac13c58cd78962ad73e4a87ee074286a",
       "files": 9
+    },
+    {
+      "kind": "module-payload",
+      "timestamp": 1793181924,
+      "date": "2026-10-28T17:05:24+07:00",
+      "title": "fix(history): Recover dashboard v1-53d6e072f4cbfd19",
+      "event_id": "d3aafd4e34a1431ab383af0afc286ebe",
+      "module": "dashboard",
+      "release": "v1-53d6e072f4cbfd19",
+      "source_hash": "53d6e072f4cbfd1915d594fd0a1e3aced346ed2cfb1d882da57b5c14db84da2d",
+      "bundle": "pi-control-ssd-20261028-r6b",
+      "manifest_sha256": "b6d07a9e056bf333f5bf763c06457f84ac13c58cd78962ad73e4a87ee074286a",
+      "files": 44
     }
   ]
 }
