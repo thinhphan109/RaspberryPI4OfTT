@@ -66,6 +66,7 @@
   $('media-title').textContent=(d.title||'Chưa có nội dung')+(provider==='spotify'&&d.artist?' · '+d.artist:'');
   $('media-state').textContent=(standby?'Đang nghỉ':!d.connected?'Chưa kết nối':d.login_required?'Chờ đăng nhập':d.ad?(d.ad_muted?'Đã tắt tiếng quảng cáo':'Đang quảng cáo'):!d.has_video?'Chọn nội dung để bắt đầu':d.paused?'Đã tạm dừng':'Đang phát')+(d.autoplay?' · Tự phát':'');
   $('media-state').className='badge '+(d.connected?'badge-success':'badge-warning');
+  if(provider==='spotify'&&d.has_video&&!d.paused&&d.playback_observed===false){$('media-state').textContent='Player báo đang phát · chưa xác minh âm thanh';$('media-state').className='badge badge-warning'}
   if(guard?.paused){$('media-state').textContent='Tạm dừng · kiểm tra loa';$('media-state').className='badge badge-warning'}
   $('media-toggle').textContent=d.paused?'▶ Phát':'Ⅱ Tạm dừng';
   $('media-progress').max=d.duration||1;$('media-progress').value=d.position||0;
