@@ -89,7 +89,7 @@ class Connection:
                 if data.get('error'):
                     raise ValueError('Browser command failed')
                 return data.get('result', {})
-        raise ValueError('Browser response timed out')
+        raise TimeoutError('Browser response timed out')
 
     def close(self):
         self.socket.close()
@@ -162,12 +162,22 @@ class Catalog:
             page.call('Network.setBlockedURLs', {'urls':['*.jpg','*.jpeg','*.png','*.webp','*.woff2']})
             page.call('Page.navigate', {'url':url})
             deadline = time.monotonic()+22
+            first_rows_at=None
+            changed_at=time.monotonic()
             while time.monotonic() < deadline:
-                result = page.call('Runtime.evaluate', {'expression':SPOTIFY_JS if provider == 'spotify' else YOUTUBE_JS, 'returnByValue':True})
+                try:
+                    result = page.call('Runtime.evaluate', {'expression':SPOTIFY_JS if provider == 'spotify' else YOUTUBE_JS, 'returnByValue':True})
+                except (websocket.WebSocketTimeoutException, TimeoutError):
+                    # Chromium can spend several seconds compiling a cold site.
+                    # Keep the same bounded job and ignore late response IDs.
+                    continue
                 raw = result.get('result', {}).get('value') or {}
-                rows = results(provider, raw)
+                found = results(provider, raw)
+                if found!=rows:changed_at=time.monotonic()
+                rows=found
                 if rows:
-                    break
+                    if first_rows_at is None:first_rows_at=time.monotonic()
+                    if len(rows)>=12 or time.monotonic()-first_rows_at>=3 and time.monotonic()-changed_at>=1.2:break
                 time.sleep(.6)
             message = f'{len(rows)} kết quả · phát trên loa của Pi' if rows else 'Chưa có kết quả. Kiểm tra đăng nhập, kết nối hoặc thử từ khóa khác trên Pi.'
             if rows:
