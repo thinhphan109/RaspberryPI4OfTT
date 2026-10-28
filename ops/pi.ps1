@@ -1,4 +1,4 @@
-﻿param(
+param(
     [ValidateSet('Authorize','Check','Audit','Deploy','Rollback')][string]$Action = 'Check',
     [ValidatePattern('^[a-zA-Z0-9][a-zA-Z0-9._-]*$')][string]$Target = 'rasp-tt',
     [ValidatePattern('^[0-9.]+$')][string]$Address,
@@ -42,17 +42,17 @@ $remoteCreated = $false
 try {
     $files = @('ops/audit.sh')
     if ($Action -eq 'Deploy') {
-        $files = @('ops/deploy.sh','piwifi-manager/media.py','piwifi-manager/media_agent.py','piwifi-manager/media_policy.py','piwifi-manager/audio_control.py','piwifi-manager/storage_writes.py','piwifi-manager/static/audio.js','piwifi-manager/static/storage-writes.js','piwifi-manager/static/media.js','piwifi-manager/systemd/pi-media.service','piwifi-manager/systemd/pi-media-browser.service','piwifi-manager/app.py','piwifi-manager/hub.py','piwifi-manager/apps.json','piwifi-manager/static/hub.js','piwifi-manager/helper/piwifi-dns-sync','piwifi-manager/systemd/90-piwifi-dns','piwifi-manager/templates/index.html',
-            'piwifi-manager/observer.py','piwifi-manager/state.py','piwifi-manager/mcp_server.py',
-            'piwifi-manager/hardware.py','piwifi-manager/security.py','piwifi-manager/static/hardware.js',
-            'piwifi-manager/static/fonts/jetbrains-mono.woff2','piwifi-manager/static/fonts/JetBrainsMono-OFL.txt',
-            'piwifi-manager/static/operations.js','piwifi-manager/systemd/piwifi-observer.service',
-            'piwifi-manager/metrics.py','piwifi-manager/helper/piwifi-guard',
-            'piwifi-manager/static/dashboard.css','piwifi-manager/static/studio.css','piwifi-manager/static/charts.js','piwifi-manager/static/dashboard.js','piwifi-manager/static/theme.js',
-            'piwifi-manager/static/raspberry-pi.png','piwifi-manager/static/fonts/noto-sans.woff2','piwifi-manager/static/fonts/OFL.txt',
-            'piwifi-manager/systemd/piwifi-guard.service','piwifi-manager/systemd/piwifi-guard.timer',
-            'piwifi-manager/helper/piwifi-helper','piwifi-manager/systemd/piwifi-web.service',
-            'piwifi-manager/sudoers/piwifi-web','piwifi-manager/scripts/install.sh')
+        $files = @('ops/deploy.sh','pi-control/camera.py','pi-control/camera_agent.py','pi-control/camera_policy.py','pi-control/static/camera.js','pi-control/static/camera.css','pi-control/templates/camera.html','pi-control/systemd/pi-camera.service','pi-control/media.py','pi-control/media_agent.py','pi-control/media_policy.py','pi-control/media_extras.py','pi-control/media_catalog.py','pi-control/youtube_quality.py','pi-control/spotify_player.py','pi-control/audio_control.py','pi-control/storage_writes.py','pi-control/static/audio.js','pi-control/static/storage-writes.js','pi-control/static/media.js','pi-control/static/quick-audio.js','pi-control/static/media-library.js','pi-control/systemd/pi-media.service','pi-control/systemd/pi-media-browser.service','pi-control/app.py','pi-control/read_cache.py','pi-control/runtime_config.py','pi-control/audio_agent.py','pi-control/audio_client.py','pi-control/camera_renderer.py','pi-control/render_jobs.py','pi-control/service_catalog.py','pi-control/service_catalog.json','pi-control/deployment_history.py','pi-control/hub.py','pi-control/apps.json','pi-control/static/hub.js','pi-control/helper/piwifi-dns-sync','pi-control/systemd/90-piwifi-dns','pi-control/templates/index.html',
+            'pi-control/observer.py','pi-control/system_events.py','pi-control/state.py','pi-control/mcp_server.py',
+            'pi-control/hardware.py','pi-control/security.py','pi-control/static/hardware.js',
+            'pi-control/static/fonts/jetbrains-mono.woff2','pi-control/static/fonts/JetBrainsMono-OFL.txt',
+            'pi-control/static/operations.js','pi-control/systemd/piwifi-observer.service',
+            'pi-control/metrics.py','pi-control/helper/piwifi-guard',
+            'pi-control/templates/help.html','pi-control/static/interface.js','pi-control/static/service-help.js','pi-control/static/dashboard.css','pi-control/static/studio.css','pi-control/static/charts.js','pi-control/static/dashboard.js','pi-control/static/theme.js',
+            'pi-control/static/raspberry-pi.png','pi-control/static/fonts/noto-sans.woff2','pi-control/static/fonts/OFL.txt',
+            'pi-control/systemd/piwifi-guard.service','pi-control/systemd/piwifi-guard.timer',
+            'pi-control/helper/piwifi-helper','pi-control/systemd/piwifi-web.service',
+            'pi-control/sudoers/piwifi-web','pi-control/scripts/install.sh')
     }
     # Package an explicit allowlist; never include runtime secrets or the whole workspace.
     foreach ($file in $files) {

@@ -1,6 +1,15 @@
 # Run interactively in the user's terminal. The password stays in OpenSSH.
-param([switch]$DryRun)
+param(
+    [switch]$DryRun,
+    [ValidatePattern('^[0-9.]+$')][string]$Address
+)
 $ErrorActionPreference = 'Stop'
+$sshOptions = @('-o','StrictHostKeyChecking=yes')
+if ($Address) {
+    $parsedAddress = [System.Net.IPAddress]::Parse($Address)
+    if ($parsedAddress.AddressFamily -ne [System.Net.Sockets.AddressFamily]::InterNetwork) { throw 'An IPv4 address is required.' }
+    $sshOptions += @('-o',"HostName=$Address",'-o','HostKeyAlias=raspberrypi.local')
+}
 $keyPath = Join-Path $env:USERPROFILE '.ssh/rasp_tt_ed25519.pub'
 if (-not (Test-Path -LiteralPath $keyPath)) { throw 'Dedicated public key is missing.' }
 $publicKey = [IO.File]::ReadAllText($keyPath).Trim()
@@ -29,9 +38,10 @@ $scriptEncoded = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($remot
 # Windows PowerShell 5.1 native argument handling cannot strip the inner quotes.
 $remoteCommand = "printf %s $scriptEncoded | base64 -d | sh"
 if ($DryRun) { Write-Output $remoteCommand; return }
-& ssh -o StrictHostKeyChecking=yes -o PubkeyAuthentication=no -o PreferredAuthentications=keyboard-interactive,password rasp-tt $remoteCommand
+& ssh @sshOptions -o PubkeyAuthentication=no -o PreferredAuthentications=keyboard-interactive,password rasp-tt $remoteCommand
 if ($LASTEXITCODE -ne 0) { throw 'Public key installation failed.' }
-& ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=10 rasp-tt 'hostname; id; uname -m'
+& ssh @sshOptions -o BatchMode=yes -o ConnectTimeout=10 rasp-tt 'hostname; id; uname -m'
 if ($LASTEXITCODE -ne 0) { throw 'Public key installed but key authentication failed.' }
 Write-Output 'SSH key authentication verified.'
-& (Join-Path $PSScriptRoot 'pi.ps1') -Action Check
+if ($Address) { & (Join-Path $PSScriptRoot 'pi.ps1') -Action Check -Address $Address }
+else { & (Join-Path $PSScriptRoot 'pi.ps1') -Action Check }

@@ -1,3 +1,14 @@
+# Spotify Free — 4.2
+
+Media có nút chọn YouTube / Spotify. Bật Media, chọn Spotify, đăng nhập trực tiếp
+trên Pi khi cần; Dashboard không nhận mật khẩu. Dán link bài hoặc playlist vào
+Phát ngay. Hẹn giờ ngủ/giới hạn âm lượng dùng chung; Spotify quản lý queue và đề
+xuất, Nonstop/chống lặp của Dashboard chỉ áp dụng YouTube.
+
+Checkbox tắt tiếng quảng cáo bổ sung uBlock Origin Lite hiện có, không phải
+SpotX Windows; không bảo đảm loại bỏ hết quảng cáo. Chi tiết và giới hạn kiểm
+chứng: `pi-control/docs/V42_SPOTIFY.md`.
+
 # Pi Media — Dashboard 3.6
 
 Mở <https://rasp4.thinhme.tech/#media> và đăng nhập bằng tài khoản Dashboard.
@@ -154,6 +165,10 @@ It controls only the dedicated Media player; other desktop audio is unaffected.
 The watchdog checks every3seconds; it is not a hardware sound pressure limiter.
 
 # Local dislikes, sleep and repeat protection (3.8)
+
+Trên OS SSD, tính năng mới ngày28/10/2026 đã triển khai theo module riêng: ghim
+nội dung, xác nhận trạng thái điều khiển và bảo vệ khi mất loa Bluetooth. Xem
+[Media r5](../pi-control/docs/MEDIA_R5.md). Các release legacy phía dưới là lịch sử.
 
 Deployed18October2026:release`20261018T121211-261691`; root-only recovery snapshot
 `/var/lib/piwifi-deploy/20261018T121211-261691` (five retained).88Python tests,

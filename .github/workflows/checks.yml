@@ -22,17 +22,29 @@ jobs:
           node-version: '22'
       - name: Install test dependencies
         run: python -m pip install -r ops/test-requirements.txt
+      - name: Install camera render test dependency
+        run: sudo apt-get update -qq && sudo apt-get install -y ffmpeg
       - name: Python syntax and shell syntax
         run: |
-          python -m compileall -q piwifi-manager ops
-          find ops piwifi-manager/scripts -name '*.sh' -print0 | xargs -0 -n1 bash -n
+          python -m compileall -q pi-control ops
+          find ops pi-control/scripts -name '*.sh' -print0 | xargs -0 -n1 bash -n
       - name: Linux application tests
-        working-directory: piwifi-manager
+        working-directory: pi-control
         run: python -m unittest discover -s tests -v
       - name: Chart and polling checks
         run: |
-          node piwifi-manager/tests/test_charts.js
-          node piwifi-manager/tests/test_polling.js
+          node pi-control/tests/test_charts.js
+          node pi-control/tests/test_polling.js
+          node --check pi-control/static/camera.js
+          node pi-control/tests/test_camera_polling.js
+          node pi-control/tests/test_interface.js
+          node pi-control/tests/test_feedback.js
+          node pi-control/tests/test_events_ui.js
+          node pi-control/tests/test_spotify_js.js
+          node pi-control/tests/test_media_sources.js
+          node pi-control/tests/test_media_extras.js
+          node pi-control/tests/test_quick_media.js
+          node pi-control/tests/test_service_help.js
           node ops/test-nonstop.js
       - name: Encrypted backup tests
         run: python -m unittest discover -s ops/tests -v

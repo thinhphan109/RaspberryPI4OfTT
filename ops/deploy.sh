@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 if [[ $EUID -ne 0 ]]; then exec sudo -n bash "$0"; fi
+[[ ! -f /etc/pi-control/runtime.json ]] || { echo 'Modular SSD system: use the SSD bootstrap installer per module'; exit 1; }
 exec 9>/run/lock/piwifi-deploy.lock
 flock -n 9 || { echo 'Another deployment is running'; exit 1; }
 exec 10>/run/piwifi-network.lock
@@ -9,9 +10,23 @@ export PIWIFI_DEPLOY_LOCKED=1
 export PIWIFI_RELEASE_ID="$(date -u +%Y%m%dT%H%M%S)-$$"
 cd "$(dirname "$0")/.."
 command -v nmcli >/dev/null
+# Do not cut off a recording or its renderer during a source switch.
+if [[ -f /opt/piwifi-web/camera.py ]]; then
+  runuser -u thinh -- python3 -B - <<'PY'
+import sys
+sys.path.insert(0, '/opt/piwifi-web')
+import camera
+try:
+    data = camera.call({'action':'status'})
+except (OSError, RuntimeError, ValueError):
+    raise SystemExit('Cannot verify camera state; deployment stopped before changes')
+if data.get('recording') or data.get('rendering'):
+    raise SystemExit('Camera is recording/rendering; finish the session before deploying')
+PY
+fi
 python3 - <<'PY'
 import ast
-for p in ('piwifi-manager/media.py', 'piwifi-manager/media_agent.py', 'piwifi-manager/media_policy.py', 'piwifi-manager/audio_control.py','piwifi-manager/storage_writes.py', 'piwifi-manager/app.py', 'piwifi-manager/hub.py', 'piwifi-manager/helper/piwifi-dns-sync', 'piwifi-manager/metrics.py', 'piwifi-manager/observer.py', 'piwifi-manager/state.py', 'piwifi-manager/mcp_server.py', 'piwifi-manager/hardware.py', 'piwifi-manager/security.py', 'piwifi-manager/helper/piwifi-helper', 'piwifi-manager/helper/piwifi-guard'):
+for p in ('pi-control/camera.py','pi-control/camera_agent.py','pi-control/camera_policy.py','pi-control/media.py', 'pi-control/media_agent.py', 'pi-control/media_policy.py','pi-control/media_extras.py','pi-control/media_catalog.py','pi-control/youtube_quality.py','pi-control/spotify_player.py', 'pi-control/audio_control.py','pi-control/storage_writes.py', 'pi-control/system_events.py', 'pi-control/app.py','pi-control/read_cache.py','pi-control/runtime_config.py','pi-control/audio_agent.py','pi-control/audio_client.py','pi-control/camera_renderer.py','pi-control/render_jobs.py','pi-control/service_catalog.py','pi-control/deployment_history.py', 'pi-control/hub.py', 'pi-control/helper/piwifi-dns-sync', 'pi-control/metrics.py', 'pi-control/observer.py', 'pi-control/state.py', 'pi-control/mcp_server.py', 'pi-control/hardware.py', 'pi-control/security.py', 'pi-control/helper/piwifi-helper', 'pi-control/helper/piwifi-guard'):
     with open(p, encoding='utf-8') as f:
         ast.parse(f.read(), filename=p)
 PY
@@ -28,6 +43,7 @@ fi
 paths=(opt/piwifi-web usr/local/lib/piwifi usr/local/sbin/piwifi-helper usr/local/sbin/piwifi-guard usr/local/sbin/wifi-fallback-guard etc/piwifi-web.env etc/sudoers.d/piwifi-web etc/systemd/system/piwifi-web.service etc/systemd/system/piwifi-guard.service etc/systemd/system/piwifi-guard.timer etc/systemd/system/piwifi-observer.service var/lib/piwifi-events/release.json)
 existing=()
 paths+=(etc/systemd/user/pi-media.service etc/systemd/user/pi-media-browser.service usr/local/sbin/piwifi-dns-sync etc/NetworkManager/dispatcher.d/90-piwifi-dns etc/adguardhome/AdGuardHome.yaml usr/local/sbin/piwifi-pihole-sync etc/NetworkManager/dispatcher.d/90-piwifi-pihole etc/pihole/pihole.toml)
+paths+=(etc/systemd/user/pi-camera.service)
 if [[ -L /opt/piwifi-web ]]; then
   release="$(readlink -f /opt/piwifi-web)"
   [[ "$(dirname "$release")" == /opt/piwifi-releases ]] || { echo 'Unexpected release target'; exit 1; }
@@ -43,6 +59,8 @@ systemctl is-enabled --quiet piwifi-guard.timer && touch "$snapshot/guard-enable
 systemctl is-active --quiet piwifi-guard.timer && touch "$snapshot/guard-active" || true
 systemctl is-active --quiet piwifi-observer && touch "$snapshot/observer-active" || true
 systemctl is-enabled --quiet piwifi-observer && touch "$snapshot/observer-enabled" || true
+runuser -u thinh -- env XDG_RUNTIME_DIR=/run/user/1000 systemctl --user is-active --quiet pi-camera && touch "$snapshot/camera-active" || true
+runuser -u thinh -- env XDG_RUNTIME_DIR=/run/user/1000 systemctl --user is-enabled --quiet pi-camera && touch "$snapshot/camera-enabled" || true
 cat > "$snapshot/restore.sh" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -62,6 +80,7 @@ systemctl disable --now piwifi-web 2>/dev/null || true
 systemctl disable --now piwifi-guard.timer 2>/dev/null || true
 systemctl stop piwifi-guard.service 2>/dev/null || true
 systemctl disable --now piwifi-observer 2>/dev/null || true
+runuser -u thinh -- env XDG_RUNTIME_DIR=/run/user/1000 systemctl --user disable --now pi-camera 2>/dev/null || true
 # Fixed project-owned destinations; reject directories replaced by symlinks.
 if [[ -L /opt/piwifi-web ]]; then
   [[ "$(dirname "$(readlink -f /opt/piwifi-web)")" == /opt/piwifi-releases ]] || exit 1
@@ -80,12 +99,19 @@ fi
 rm -f -- /etc/systemd/system/piwifi-observer.service /var/lib/piwifi-events/release.json
 rm -f -- /usr/local/sbin/piwifi-dns-sync /etc/NetworkManager/dispatcher.d/90-piwifi-dns /usr/local/sbin/piwifi-pihole-sync /etc/NetworkManager/dispatcher.d/90-piwifi-pihole
 tar -xzpf files.tar.gz -C /
+if [[ ! -f /opt/piwifi-web/camera_agent.py ]]; then
+  rm -f /etc/systemd/user/pi-camera.service
+fi
 # Restore matching user-agent units, or retire them for a pre-Media release.
 if [[ ! -f /opt/piwifi-web/media_agent.py ]]; then
   runuser -u thinh -- env XDG_RUNTIME_DIR=/run/user/1000 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus systemctl --user disable --now pi-media pi-media-browser 2>/dev/null || true
   rm -f /etc/systemd/user/pi-media.service /etc/systemd/user/pi-media-browser.service
 fi
 runuser -u thinh -- env XDG_RUNTIME_DIR=/run/user/1000 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus systemctl --user daemon-reload 2>/dev/null || true
+if [[ -f /opt/piwifi-web/camera_agent.py ]]; then
+  if [[ -f camera-enabled ]]; then runuser -u thinh -- env XDG_RUNTIME_DIR=/run/user/1000 systemctl --user enable pi-camera; fi
+  if [[ -f camera-active ]]; then runuser -u thinh -- env XDG_RUNTIME_DIR=/run/user/1000 systemctl --user start pi-camera; fi
+fi
 if [[ -f /opt/piwifi-web/media_agent.py ]]; then
   runuser -u thinh -- env XDG_RUNTIME_DIR=/run/user/1000 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus systemctl --user restart pi-media
 fi
@@ -101,7 +127,7 @@ SH
 chmod 0700 "$snapshot/restore.sh"
 ln -sfn "$snapshot" "$base/latest"
 trap 'rc=$?; echo "Deploy failed; restoring snapshot"; bash "$snapshot/restore.sh"; exit "$rc"' ERR
-cd piwifi-manager
+cd pi-control
 bash scripts/install.sh
 python3 - <<'PY'
 import time, urllib.request
@@ -128,8 +154,8 @@ for p in sorted(Path('/opt/piwifi-web').rglob('*')):
     if p.is_file() and '__pycache__' not in p.parts:
         digest.update(str(p.relative_to('/opt/piwifi-web')).encode())
         digest.update(p.read_bytes())
-state.write('release.json', dict(version='3.13.1', timestamp=int(time.time()), source_hash=digest.hexdigest(), release=Path('/opt/piwifi-web').resolve().name))
-state.event('deploy', 'Đã triển khai dashboard 3.13.1 và kiểm tra dịch vụ')
+state.write('release.json', dict(version='4.2.0', timestamp=int(time.time()), source_hash=digest.hexdigest(), release=Path('/opt/piwifi-web').resolve().name))
+state.event('deploy', 'Đã triển khai dashboard 4.2.0 và kiểm tra dịch vụ')
 PY
 # Retire the unscheduled legacy guard; its exact previous bytes are in the snapshot.
 rm -f -- /usr/local/sbin/wifi-fallback-guard

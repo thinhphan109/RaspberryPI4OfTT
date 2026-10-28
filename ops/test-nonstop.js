@@ -1,5 +1,5 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
-const source=fs.readFileSync(require('node:path').join(__dirname,'../piwifi-manager/media_agent.py'),'utf8');
+const source=fs.readFileSync(require('node:path').join(__dirname,'../pi-control/media_agent.py'),'utf8');
 const js=source.match(/NONSTOP_JS="""([\s\S]*?)"""/)[1];
 function run(text){
  let toggles=0,plays=0,confirms=0;

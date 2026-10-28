@@ -1,0 +1,215 @@
+{
+  "schema": "pi-control.modular-history-export/v1",
+  "events": [
+    {
+      "event_id": "4c11e210be18488688b9836547a190a3",
+      "timestamp": 1793088558,
+      "kind": "deploy",
+      "message": "network: installed · v1-cff85b25359b4762",
+      "level": "info",
+      "module": "network",
+      "release": "v1-cff85b25359b4762",
+      "source_hash": "cff85b25359b47620f37648b5dd99d54454f07dac1460b2a733d6e3c5d4d3555"
+    },
+    {
+      "event_id": "7255eff2bf59472194ceb99a71068cc0",
+      "timestamp": 1793088560,
+      "kind": "deploy",
+      "message": "observer: installed · v1-f70dec803a4f0743",
+      "level": "info",
+      "module": "observer",
+      "release": "v1-f70dec803a4f0743",
+      "source_hash": "f70dec803a4f07434e17d946924316ad0708e2974431fea4c9ca012eb5fabc2a"
+    },
+    {
+      "event_id": "9b82e473c40d4776bcf2a81624b5a203",
+      "timestamp": 1793088563,
+      "kind": "deploy",
+      "message": "dashboard: installed · v1-f90cb720c693fed9",
+      "level": "info",
+      "module": "dashboard",
+      "release": "v1-f90cb720c693fed9",
+      "source_hash": "f90cb720c693fed9f31cff3521d63449cff84c936050df300615f56042cd6277"
+    },
+    {
+      "event_id": "159b24e46ebc4113a6ff09e39c53aa98",
+      "timestamp": 1793088564,
+      "kind": "deploy",
+      "message": "audio: installed · v1-8d5f887d3e3606a0",
+      "level": "info",
+      "module": "audio",
+      "release": "v1-8d5f887d3e3606a0",
+      "source_hash": "8d5f887d3e3606a0976be5eb72f6e71b3d78f0550f5945d5618eb84fd6cf156f"
+    },
+    {
+      "event_id": "f6ad5c5c66c444c89ae78c915796972c",
+      "timestamp": 1793088565,
+      "kind": "deploy",
+      "message": "media: installed · v1-adb97a8b6e6546f4",
+      "level": "info",
+      "module": "media",
+      "release": "v1-adb97a8b6e6546f4",
+      "source_hash": "adb97a8b6e6546f4f3278442ba4b2648acf594fb9015dcbf0bf7c8013416504a"
+    },
+    {
+      "event_id": "80e9805351d3465a97a4b6fe63a8b12b",
+      "timestamp": 1793088566,
+      "kind": "deploy",
+      "message": "render: installed · v1-87301338a2dc48e9",
+      "level": "info",
+      "module": "render",
+      "release": "v1-87301338a2dc48e9",
+      "source_hash": "87301338a2dc48e9b65e9aef7b89efdfb6d657f8ff545e21ee88fa2c1f1bddc5"
+    },
+    {
+      "event_id": "4ae74787f8dc4f49bde7cea826f7ef56",
+      "timestamp": 1793088567,
+      "kind": "deploy",
+      "message": "camera: installed · v1-5a997a333b6f95da",
+      "level": "info",
+      "module": "camera",
+      "release": "v1-5a997a333b6f95da",
+      "source_hash": "5a997a333b6f95dad8963307198d37d9901ee62d259a1d292ffeded0afa6de82"
+    },
+    {
+      "event_id": "0c414fb8aaef47a49a94418ffd706174",
+      "timestamp": 1793088570,
+      "kind": "deploy",
+      "message": "dns: installed · v1-29bdb237f185af9f",
+      "level": "info",
+      "module": "dns",
+      "release": "v1-29bdb237f185af9f",
+      "source_hash": "29bdb237f185af9fd3e1135a6c9191512e1b060606c35c849daa11a1c9bcb5b6"
+    },
+    {
+      "event_id": "5ff618ba571b4115821969ddc8245f7f",
+      "timestamp": 1793176637,
+      "kind": "deploy",
+      "message": "dashboard: installed · v1-0d77f09cbc1523fd",
+      "level": "info",
+      "module": "dashboard",
+      "release": "v1-0d77f09cbc1523fd",
+      "source_hash": "0d77f09cbc1523fd9cb35128f42cb015dce4fceb5742c81e2930139abe24275e"
+    },
+    {
+      "event_id": "3ec5046483ba43e3979bfdabe24f6fc5",
+      "timestamp": 1793176642,
+      "kind": "deploy",
+      "message": "observer: installed · v1-93a78cfb42a243af",
+      "level": "info",
+      "module": "observer",
+      "release": "v1-93a78cfb42a243af",
+      "source_hash": "93a78cfb42a243aff8ff7ba1326584996c00a6e6e3bb3d17869ec619e0a23bba"
+    },
+    {
+      "event_id": "73e2504148fc443a9fd4b3872133825c",
+      "timestamp": 1793178405,
+      "kind": "deploy",
+      "message": "media: installed · v1-5aec8e1324a5384e",
+      "level": "info",
+      "module": "media",
+      "release": "v1-5aec8e1324a5384e",
+      "source_hash": "5aec8e1324a5384e856146e548e26c918f7293a90840d3814785730f989ea3cd"
+    },
+    {
+      "event_id": "efaee309c7b04728b378a67f241021ee",
+      "timestamp": 1793178410,
+      "kind": "deploy",
+      "message": "dashboard: installed · v1-c7e857a657bba395",
+      "level": "info",
+      "module": "dashboard",
+      "release": "v1-c7e857a657bba395",
+      "source_hash": "c7e857a657bba39593e1c2a1e72f210ff58b5ef1a41dc297ad584f4e7d44c451"
+    },
+    {
+      "event_id": "c98a72ea3e394c3e8ad5f4b3601ad527",
+      "timestamp": 1793179002,
+      "kind": "deploy",
+      "message": "media: installed · v1-f879390b6518f0aa",
+      "level": "info",
+      "module": "media",
+      "release": "v1-f879390b6518f0aa",
+      "source_hash": "f879390b6518f0aac331c07f4ec73de7cb845c9098fbeab3b4bc1f7d65017780"
+    },
+    {
+      "event_id": "3539e9b094f14757bbe82b03ee7af2bd",
+      "timestamp": 1793179007,
+      "kind": "deploy",
+      "message": "dashboard: installed · v1-e7dd48f540d63b49",
+      "level": "info",
+      "module": "dashboard",
+      "release": "v1-e7dd48f540d63b49",
+      "source_hash": "e7dd48f540d63b497f83edf4651ac266cc2ed6884d3d090186fc21f8301f4bf1"
+    },
+    {
+      "event_id": "f610485b1f444bad9c363daaea9ae128",
+      "timestamp": 1793179448,
+      "kind": "deploy",
+      "message": "media: installed · v1-321e20c52e9a5fd3",
+      "level": "info",
+      "module": "media",
+      "release": "v1-321e20c52e9a5fd3",
+      "source_hash": "321e20c52e9a5fd3467aa4a7df695c5968f6a0fcad0cb2d3da21a7f7e68b3564"
+    },
+    {
+      "event_id": "9f8cdb9c107b4be6aea0f421b0b69394",
+      "timestamp": 1793179460,
+      "kind": "deploy",
+      "message": "dashboard: installed · v1-b3929f65aeb1ab91",
+      "level": "info",
+      "module": "dashboard",
+      "release": "v1-b3929f65aeb1ab91",
+      "source_hash": "b3929f65aeb1ab9151d5373f1676c9b874de67e11b07851b53f5f814d11b5655"
+    },
+    {
+      "event_id": "775eadb3e0534b74aa43b72be4e58ad6",
+      "timestamp": 1793179730,
+      "kind": "deploy",
+      "message": "media: installed · v1-df37732000a8d48c",
+      "level": "info",
+      "module": "media",
+      "release": "v1-df37732000a8d48c",
+      "source_hash": "df37732000a8d48c484e298afe3ffa2e26ab7199e028dd2b26183d01c79e4280"
+    },
+    {
+      "event_id": "4adf6f6575734feeb14b686239933433",
+      "timestamp": 1793181916,
+      "kind": "deploy",
+      "message": "audio: installed · v1-1ff508e4bf78ec48",
+      "level": "info",
+      "module": "audio",
+      "release": "v1-1ff508e4bf78ec48",
+      "source_hash": "1ff508e4bf78ec48fc0079821003c3a14ef06b8be3ae7d8f7566765ca0ac0fd1"
+    },
+    {
+      "event_id": "8cf9527c38bd4c2fb7033c7cdb5f5e07",
+      "timestamp": 1793181919,
+      "kind": "deploy",
+      "message": "media: installed · v1-ec294956c0e5654b",
+      "level": "info",
+      "module": "media",
+      "release": "v1-ec294956c0e5654b",
+      "source_hash": "ec294956c0e5654ba7348936b28c7b4d07238386e8d688a5f8c04467be6fb4ec"
+    },
+    {
+      "event_id": "d3aafd4e34a1431ab383af0afc286ebe",
+      "timestamp": 1793181924,
+      "kind": "deploy",
+      "message": "dashboard: installed · v1-53d6e072f4cbfd19",
+      "level": "info",
+      "module": "dashboard",
+      "release": "v1-53d6e072f4cbfd19",
+      "source_hash": "53d6e072f4cbfd1915d594fd0a1e3aced346ed2cfb1d882da57b5c14db84da2d"
+    },
+    {
+      "event_id": "f9f832b3fec540d1a16006db98e03542",
+      "timestamp": 1793182518,
+      "kind": "deploy",
+      "message": "media: installed · v1-718e27c828b7903e",
+      "level": "info",
+      "module": "media",
+      "release": "v1-718e27c828b7903e",
+      "source_hash": "718e27c828b7903efcab5b330c8cfb011cb62b2a7180cddb73f038d06a5e1251"
+    }
+  ]
+}

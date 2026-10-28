@@ -2,7 +2,7 @@
 from pathlib import Path
 import urllib.request
 
-root = Path(__file__).resolve().parents[1] / 'piwifi-manager/static'
+root = Path(__file__).resolve().parents[1] / 'pi-control/static'
 for name, url in {
     'raspberry-pi.png': 'https://www.raspberrypi.com/app/uploads/2022/02/COLOUR-Raspberry-Pi-Symbol-Registered.png',
     'fonts/noto-sans.ttf': 'https://raw.githubusercontent.com/google/fonts/main/ofl/notosans/NotoSans%5Bwdth,wght%5D.ttf',

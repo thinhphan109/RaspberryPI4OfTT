@@ -1,4 +1,4 @@
-﻿param([ValidateSet('GUI','Status','Authorize','Password','DnsTest','DnsEnable','DnsUpdate','DnsRestore','SSH','Camera','Backup','BackupVerify','BackupKey')][string]$Action='GUI',[string]$Address)
+﻿param([ValidateSet('GUI','Status','Authorize','Password','FallbackPassword','DnsTest','DnsEnable','DnsUpdate','DnsRestore','SSH','Camera','Backup','BackupVerify','BackupKey')][string]$Action='GUI',[string]$Address)
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'pi-target.ps1')
 if ($Action -ne 'GUI') {
@@ -16,6 +16,7 @@ if ($Action -ne 'GUI') {
             'Backup' { & (Join-Path $PSScriptRoot 'backup.ps1') -Action Create -Address $pi.Address }
             'Authorize' { & (Join-Path $PSScriptRoot 'pi.ps1') -Action Authorize -Address $pi.Address }
             'Password' { & (Join-Path $PSScriptRoot 'adguard.ps1') -Action CopyPassword -Address $pi.Address }
+            'FallbackPassword' { & (Join-Path $PSScriptRoot 'fallback-password.ps1') -Address $pi.Address }
             'DnsTest' { & (Join-Path $PSScriptRoot 'dns-windows.ps1') -Action Test -Address $pi.Address }
             'DnsEnable' {
                 $mode=if(Test-Path (Join-Path $env:LOCALAPPDATA 'PiHoleTrial/wifi-dns-before.json')){'Update'}else{'Enable'}
@@ -77,7 +78,7 @@ Add-Button 'Tìm Pi và đọc IP' {try{$null=Resolve-SelectedPi}catch{Show-Erro
 Add-Button 'Sao chép IP DNS' {try{$c=Resolve-SelectedPi;Set-Clipboard $c.Address;$status.Text='Đã sao chép '+$c.Address}catch{Show-Error $_.Exception.Message}}
 Add-Button 'Dashboard qua tên miền' {Start-Process 'https://rasp4.thinhme.tech/#apps'}
 # Entries use the same catalog deployed to Pi.
-$catalog=Get-Content -LiteralPath (Join-Path (Split-Path $PSScriptRoot) 'piwifi-manager/apps.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+$catalog=Get-Content -LiteralPath (Join-Path (Split-Path $PSScriptRoot) 'pi-control/apps.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 foreach($item in $catalog) {
     if($item.loopback){continue}
     $handler={try{$c=Resolve-SelectedPi;$appItem=$this.Tag;Start-Process ('http://'+$c.Address+':'+$appItem.port+$appItem.path)}catch{Show-Error $_.Exception.Message}}
@@ -86,7 +87,8 @@ foreach($item in $catalog) {
 Add-Button 'Camera qua SSH tunnel' {Launch-Task 'Camera'}
 Add-Button 'Kiểm tra toàn hệ thống' {Launch-Task 'Status'}
 Add-Button 'Cấp quyền sudo tạm' {Launch-Task 'Authorize'}
-Add-Button 'Chép mật khẩu AdGuard Home' {Launch-Task 'Password'}
+Add-Button 'Chép mật khẩu Dashboard / AdGuard' {Launch-Task 'Password'}
+Add-Button 'Chép mật khẩu Wi-Fi dự phòng' {Launch-Task 'FallbackPassword'}
 Add-Button 'Kiểm tra DNS' {Launch-Task 'DnsTest'}
 Add-Button 'Bật DNS AdGuard Home' {Launch-Task 'DnsEnable' $true}
 Add-Button 'Cập nhật DNS theo IP Pi' {Launch-Task 'DnsUpdate' $true}

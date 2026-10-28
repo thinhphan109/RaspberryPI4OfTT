@@ -20,10 +20,12 @@ PATHS = (
     '/etc/systemd/system/piwifi-guard.service', '/etc/systemd/system/piwifi-guard.timer',
     '/etc/systemd/system/adguardhome.service', '/etc/systemd/user/pi-media.service',
     '/etc/systemd/user/pi-media-browser.service', '/etc/NetworkManager/dispatcher.d/90-piwifi-dns',
+    '/etc/systemd/user/pi-camera.service', '/home/thinh/.local/state/pi-camera',
     '/etc/sudoers.d/piwifi-web', '/etc/log2ram.conf',
     '/home/thinh/.config/adguardhome', '/home/thinh/.config/easyeffects',
     '/home/thinh/.local/state/pi-media', '/home/thinh/.local/state/wireplumber',
     '/var/lib/piwifi-observer/storage-writes.db',
+    '/var/lib/piwifi-observer/system-events.json',
 )
 
 
