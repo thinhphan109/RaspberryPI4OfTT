@@ -323,6 +323,19 @@
       "bundle": "pi-control-ssd-20261028-r5e",
       "manifest_sha256": "fed5ba7972033c80c75b8abe13da591950445999cde52b0b58d0229c2dbb657d",
       "files": 7
+    },
+    {
+      "kind": "module-payload",
+      "timestamp": 1793181916,
+      "date": "2026-10-28T17:05:16+07:00",
+      "title": "fix(history): Recover audio v1-1ff508e4bf78ec48",
+      "event_id": "4adf6f6575734feeb14b686239933433",
+      "module": "audio",
+      "release": "v1-1ff508e4bf78ec48",
+      "source_hash": "1ff508e4bf78ec48fc0079821003c3a14ef06b8be3ae7d8f7566765ca0ac0fd1",
+      "bundle": "pi-control-ssd-20261028-r6b",
+      "manifest_sha256": "b6d07a9e056bf333f5bf763c06457f84ac13c58cd78962ad73e4a87ee074286a",
+      "files": 4
     }
   ]
 }

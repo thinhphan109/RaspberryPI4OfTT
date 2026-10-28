@@ -69,6 +69,16 @@ def checked_node(d):
     if item is None:raise ValueError('Thiết bị đã thay đổi; làm mới danh sách')
     return item
 
+
+def output_status():
+    """Small speaker-only read, without enumerating Bluetooth/input devices."""
+    name=default_name('output')
+    item=next((n for n in nodes() if n['kind']=='output' and n['name']==name),None)
+    if item is None:return dict(output=None,message='Chưa có đầu ra vật lý. Chọn loa trong mục Âm thanh.')
+    text=run(['wpctl','get-volume',str(item['id'])]);match=re.search(r'Volume: ([\d.]+)',text)
+    if not match:raise ValueError('Chưa đọc được âm lượng loa')
+    return dict(output=dict(item,volume=round(float(match.group(1))*100),muted='MUTED' in text),message='')
+
 def background(action,address=None):
     global CACHE_AT
     try:
@@ -95,6 +105,20 @@ def dispatch(d):
     global CACHE_AT
     action=d.get('action','status')
     if action=='status':return status()
+    if action=='output_status':return output_status()
+    if action in ('output_volume','output_mute'):
+        item=checked_node(dict(id=d.get('id'),kind='output'))
+        if item['name']!=d.get('name') or default_name('output')!=item['name']:
+            raise ValueError('Loa đang dùng đã thay đổi. Làm mới trước khi điều chỉnh.')
+        if action=='output_volume':
+            value=d.get('value')
+            if type(value) not in (int,float) or not math.isfinite(value) or not 0<=value<=100:raise ValueError('Âm lượng từ 0 đến 100%')
+            run(['wpctl','set-volume',str(item['id']),str(value/100)])
+        else:
+            if type(d.get('muted')) is not bool:raise ValueError('Cần giá trị bật/tắt tiếng')
+            run(['wpctl','set-mute',str(item['id']),'1' if d['muted'] else '0'])
+        CACHE_AT=0
+        return output_status()
     if action in ('scan','pair','connect','disconnect'):
         address=d.get('address')
         if action!='scan':
