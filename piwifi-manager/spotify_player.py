@@ -56,9 +56,9 @@ const login=[...document.querySelectorAll('[data-testid="login-button"],a[href*=
 const ad=[...document.querySelectorAll('[data-testid="ad-label"],[data-testid="audio-ad"],[data-testid="track-info-advertiser"]')].some(visible)||(/^(advertisement|quảng cáo)$/i.test(meta?.title||'')&&/^spotify$/i.test(meta?.artist||''));
 const text=(document.querySelector('[role="alert"]')?.textContent||'').trim();
 return {title:(link?.textContent||meta?.title||'Spotify').trim(),artist:meta?.artist||'',url:location.href,track_url:link?.href||'',
-artwork:meta?.artwork?.[0]?.src||info?.querySelector('img')?.src||'',has_video:!!v||visible(button),paused:v?v.paused:!(/pause|tạm dừng/i.test(button?.getAttribute('aria-label')||'')),
+artwork:meta?.artwork?.[0]?.src||info?.querySelector('img')?.src||'',has_video:!!v||(visible(button)&&!!(link||meta?.title)),paused:v?v.paused:!(/pause|tạm dừng/i.test(button?.getAttribute('aria-label')||'')),
 position:v?.currentTime||0,duration:v?.duration||0,volume:v?Math.round(v.volume*100):0,login_required:login,ad,ad_muted:ad&&!!window.__piSpotifyAdMute,
-can_seek:!!v&&Number.isFinite(v.duration)&&v.duration>0,can_next:!!document.querySelector('[data-testid="control-button-skip-forward"]:not(:disabled)'),can_toggle:visible(button),
+can_seek:!!v&&Number.isFinite(v.duration)&&v.duration>0,can_next:!!document.querySelector('[data-testid="control-button-skip-forward"]:not(:disabled)'),can_toggle:visible(button)&&!button.disabled&&!!(v||link||meta?.title),
 can_volume:!!v,position_known:!!v&&Number.isFinite(v.currentTime),playback_observed:!!v,
 notice:/protected content|widevine|DRM/i.test(text)?'Spotify chưa phát được nội dung bảo vệ; kiểm tra Widevine trên Pi.':v?.error?'Spotify báo lỗi phát; kiểm tra cửa sổ trên Pi.':''};})()"""
 

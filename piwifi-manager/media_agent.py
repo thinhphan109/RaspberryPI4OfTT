@@ -459,17 +459,17 @@ def hold_bluetooth():
         GUARD_SCRIPT=cdp('Page.addScriptToEvaluateOnNewDocument',{'source':SAFETY_MUTE_JS})['identifier']
         GUARD_TARGET=page
     held=evaluate(SAFETY_MUTE_JS)
+    if changed or not GUARD_FILE.exists():
+        pending=GUARD_FILE.with_name(GUARD_FILE.name+'.'+str(time.monotonic_ns())+'.tmp')
+        with pending.open('x') as stream:
+            pending.chmod(0o600);json.dump(dict(script=GUARD_SCRIPT,target=GUARD_TARGET),stream)
+        pending.replace(GUARD_FILE)
     if held==0 and PROVIDER=='spotify':
         # Spotify may own detached audio that DOM muting cannot reach. Closing
         # this dedicated browser is the bounded safety fallback for that case.
         set_power(False)
-        BT_GUARD.message='Đã cho Media nghỉ vì không xác minh được việc tắt tiếng Spotify. Chọn đầu ra rồi bật Media và bấm Phát.'
+        BT_GUARD.message='Đã cho Media nghỉ vì không xác minh được việc tắt tiếng Spotify. Chọn đầu ra rồi bật Media hoặc phát một mục ghim.'
         return
-    if changed or not GUARD_FILE.exists():
-        pending=GUARD_FILE.with_suffix('.tmp')
-        with pending.open('x') as stream:
-            pending.chmod(0o600);json.dump(dict(script=GUARD_SCRIPT,target=GUARD_TARGET),stream)
-        pending.replace(GUARD_FILE)
 
 
 def release_bluetooth():
@@ -506,7 +506,7 @@ def load_bluetooth_hold():
 def bluetooth_loop():
     # Audio IPC may be slow; never hold the Media lock while waiting for it.
     while True:
-        if STANDBY or not BT_GUARD.enabled:
+        if (STANDBY and not BT_GUARD.latched) or not BT_GUARD.enabled:
             time.sleep(3);continue
         try:
             if modular():
@@ -567,7 +567,7 @@ def run_command(payload):
         expected['position']=max(0,min(before.get('duration') or 864000,before.get('position',0)+value))
     elif action=='source':expected['provider']=payload.get('provider')
     elif action in ('power','start'):expected['standby']=action=='power' and payload.get('enabled') is False
-    if BT_GUARD.latched and action in ('play','shortcut_play','toggle'):
+    if BT_GUARD.latched and (action in ('play','shortcut_play','toggle','start') or action=='power' and payload.get('enabled') is True):
         release_bluetooth()
     elif BT_GUARD.latched and action in ('next','seek'):
         raise ValueError('Loa đã ngắt; chọn đầu ra rồi bấm Phát trước')
