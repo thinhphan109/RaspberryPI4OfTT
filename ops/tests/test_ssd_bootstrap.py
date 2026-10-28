@@ -111,9 +111,11 @@ class BootstrapTests(unittest.TestCase):
     def test_valid_ssd_preflight_requests_tree_with_custom_columns(self):
         mounts=[dict(fstype='ext4',uuid=HOST['root_uuid'],source='/dev/sda2'),dict(fstype='ext4',uuid=HOST['data_uuid'],source='/dev/sda3')]
         disks={'blockdevices':[dict(path='/dev/sda',size=128035676160,tran='usb',children=[dict(path='/dev/sda2'),dict(path='/dev/sda3')])]}
-        with patch.object(bootstrap,'legacy_exists',return_value=False),patch.object(bootstrap.os,'geteuid',return_value=0),patch.object(bootstrap.os,'uname',return_value=Mock(machine='aarch64')),patch.object(bootstrap,'mount_info',side_effect=mounts),patch.object(bootstrap,'command',return_value=json.dumps(disks)) as command:
+        account=Mock(pw_uid=HOST['desktop_uid'],pw_dir=HOST['desktop_home'])
+        with patch.object(bootstrap,'legacy_exists',return_value=False),patch.object(bootstrap.os,'geteuid',return_value=0),patch.object(bootstrap.os,'uname',return_value=Mock(machine='aarch64')),patch.object(bootstrap,'mount_info',side_effect=mounts),patch.object(bootstrap,'command',return_value=json.dumps(disks)) as command,patch('pwd.getpwnam',return_value=account) as lookup:
             result=bootstrap.preflight(HOST)
             self.assertEqual(result['root'],'/dev/sda2');self.assertIn('--tree',command.call_args.args[0])
+            lookup.assert_called_once_with(HOST['desktop_user'])
 
     def test_manifest_path_traversal(self):
         for value in ('/etc/passwd','../etc','x/../../y','a\\b'):
