@@ -30,7 +30,7 @@ def is_page(value, auth=False):
 def state(raw):
     if not isinstance(raw,dict):raise ValueError('Chưa đọc được Spotify')
     result={k:str(raw.get(k) or '')[:300] for k in ('title','artist','notice')}
-    for key in ('has_video','paused','ad','ad_muted','login_required','can_seek','can_next','can_toggle'):
+    for key in ('has_video','paused','ad','ad_muted','login_required','can_seek','can_next','can_toggle','can_volume','position_known'):
         result[key]=raw.get(key) is True
     for key,maximum in (('position',864000),('duration',864000),('volume',100)):
         value=raw.get(key,0)
@@ -59,6 +59,7 @@ return {title:(link?.textContent||meta?.title||'Spotify').trim(),artist:meta?.ar
 artwork:meta?.artwork?.[0]?.src||info?.querySelector('img')?.src||'',has_video:!!v||visible(button),paused:v?v.paused:!(/pause|tạm dừng/i.test(button?.getAttribute('aria-label')||'')),
 position:v?.currentTime||0,duration:v?.duration||0,volume:v?Math.round(v.volume*100):0,login_required:login,ad,ad_muted:ad&&!!window.__piSpotifyAdMute,
 can_seek:!!v&&Number.isFinite(v.duration)&&v.duration>0,can_next:!!document.querySelector('[data-testid="control-button-skip-forward"]:not(:disabled)'),can_toggle:visible(button),
+can_volume:!!v,position_known:!!v&&Number.isFinite(v.currentTime),
 notice:/protected content|widevine|DRM/i.test(text)?'Spotify chưa phát được nội dung bảo vệ; kiểm tra Widevine trên Pi.':v?.error?'Spotify báo lỗi phát; kiểm tra cửa sổ trên Pi.':''};})()"""
 
 PAUSE_JS=r"""(()=>{const v=document.querySelector('audio')||document.querySelector('video');

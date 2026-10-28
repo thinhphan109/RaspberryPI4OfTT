@@ -4,12 +4,12 @@ import socket
 from runtime_config import desktop_runtime, modular
 
 
-def call(payload):
+def call(payload, timeout=12):
     if not modular():
         import media
         return media.call({'action':'audio','payload':payload})
     with socket.socket(socket.AF_UNIX) as client:
-        client.settimeout(12)
+        client.settimeout(timeout)
         client.connect(str(desktop_runtime()/'pi-audio.sock'))
         client.sendall(json.dumps(payload).encode()+b'\n')
         data=client.makefile('rb').readline(262145)
