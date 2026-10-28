@@ -2,6 +2,11 @@
 
 Mã nguồn và công cụ vận hành hệ thống Raspberry Pi cá nhân: bảng điều khiển web, quản lý Wi-Fi, DNS, Media, âm thanh/Bluetooth và theo dõi phần cứng.
 
+Source ứng dụng nằm trong **`pi-control/`** (tên cũ `piwifi-manager/`), bộ công cụ
+vận hành ở `ops/`, tài liệu chung ở `docs/`. Workspace Windows giữ tên
+`G:\RaspberryPI4OfTT`. Xem [runbook SSD](ops/ssd_bootstrap/README.md) cho các
+module đang chạy; lệnh Deploy legacy bên dưới chỉ dành cho OS SD cũ.
+
 ## Thành phần
 
 - **Dashboard:** Flask/Gunicorn, đăng nhập, CSRF, giao diện sáng/tối, biểu đồ tài nguyên và GPIO chỉ đọc.
@@ -24,7 +29,7 @@ Từ PowerShell tại thư mục dự án:
 
 `Check` kiểm tra Pi qua SSH. `Deploy -DryRun` kiểm tra gói mã nguồn tại máy hiện tại. Đọc hướng dẫn trước khi chạy Deploy thật vì thao tác sẽ cập nhật dịch vụ trên Pi.
 
-Mở `Pi-Control.cmd` để dùng bộ công cụ Windows. Xem [README ứng dụng](piwifi-manager/README.md), [tài liệu Dashboard](piwifi-manager/docs/DASHBOARD.md) và [bố cục GPIO](piwifi-manager/docs/V313_GPIO_LAYOUT.md) để biết thêm chi tiết.
+Mở `Pi-Control.cmd` để dùng bộ công cụ Windows. Xem [README ứng dụng](pi-control/README.md), [tài liệu Dashboard](pi-control/docs/DASHBOARD.md) và [bố cục GPIO](pi-control/docs/V313_GPIO_LAYOUT.md) để biết thêm chi tiết.
 
 ## Phạm vi lưu trữ
 
