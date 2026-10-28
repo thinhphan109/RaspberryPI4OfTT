@@ -48,7 +48,7 @@ try {
             'pi-control/static/fonts/jetbrains-mono.woff2','pi-control/static/fonts/JetBrainsMono-OFL.txt',
             'pi-control/static/operations.js','pi-control/systemd/piwifi-observer.service',
             'pi-control/metrics.py','pi-control/helper/piwifi-guard',
-            'pi-control/templates/help.html','pi-control/static/interface.js','pi-control/static/service-help.js','pi-control/static/dashboard.css','pi-control/static/studio.css','pi-control/static/charts.js','pi-control/static/dashboard.js','pi-control/static/theme.js',
+            'pi-control/templates/help.html','pi-control/templates/mobile.html','pi-control/static/mobile.js','pi-control/static/mobile.css','pi-control/static/interface.js','pi-control/static/service-help.js','pi-control/static/dashboard.css','pi-control/static/studio.css','pi-control/static/charts.js','pi-control/static/dashboard.js','pi-control/static/theme.js',
             'pi-control/static/raspberry-pi.png','pi-control/static/fonts/noto-sans.woff2','pi-control/static/fonts/OFL.txt',
             'pi-control/systemd/piwifi-guard.service','pi-control/systemd/piwifi-guard.timer',
             'pi-control/helper/piwifi-helper','pi-control/systemd/piwifi-web.service',

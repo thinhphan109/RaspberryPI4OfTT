@@ -1,0 +1,21 @@
+{# Mobile shell. Controls/panels are shared once; no second player or API client. #}
+<header class="mobile-shell mobile-appbar">
+    <a class="mobile-wordmark" href="#overview" aria-label="Pi Control · Tổng quan">Pi Control<span>.</span><small>RASPBERRY PI 4</small></a>
+    <div id="mobile-header-actions" class="mobile-header-actions"><span class="mobile-device">rasp-tt</span></div>
+</header>
+<nav class="mobile-shell mobile-tabbar" aria-label="Điều hướng điện thoại">
+    <a class="nav-item mobile-tab" href="#overview" data-tab="overview">{{icon('overview')}}<span>Tổng quan</span></a>
+    <a class="nav-item mobile-tab" href="#media" data-tab="media">{{icon('music')}}<span>Media</span></a>
+    <a class="nav-item mobile-tab" href="#camera" data-tab="camera">{{icon('camera')}}<span>Camera</span></a>
+    <a class="nav-item mobile-tab" href="#network" data-tab="network">{{icon('wifi')}}<span>Mạng</span></a>
+    <button id="mobile-menu-open" class="mobile-tab" type="button" aria-haspopup="dialog" aria-controls="mobile-menu" aria-label="Mở các mục khác"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg><span>Thêm</span></button>
+</nav>
+<dialog id="mobile-menu" class="mobile-menu" aria-labelledby="mobile-menu-title">
+    <div class="mobile-menu-heading"><div><span class="eyebrow">PI CONTROL</span><h2 id="mobile-menu-title">Thiết bị &amp; hệ thống</h2></div><button id="mobile-menu-close" class="btn btn-ghost" type="button" aria-label="Đóng menu">×</button></div>
+    <nav class="mobile-menu-links" aria-label="Các mục hệ thống">
+        {% for tab,glyph,label,description in [('audio','headphones','Âm thanh','Loa, micro & Bluetooth'),('apps','apps','Ứng dụng & DNS','Ứng dụng và lọc tên miền'),('storage','storage','Lưu trữ','Ổ đĩa, lượng ghi & dịch vụ'),('activity','refresh','Hoạt động','Sự kiện & nhật ký hệ thống'),('gpio','cpu','GPIO','Tra cứu chân cắm phần cứng')] %}
+        <a class="nav-item" href="#{{tab}}" data-tab="{{tab}}">{{icon(glyph)}}<span><strong>{{label}}</strong><small>{{description}}</small></span><span class="mobile-menu-arrow" aria-hidden="true">↗</span></a>
+        {% endfor %}
+    </nav>
+    <div class="mobile-menu-footer">{{theme()}}<a class="btn btn-ghost" href="/logout">{{icon('logout')}} Đăng xuất</a></div>
+</dialog>

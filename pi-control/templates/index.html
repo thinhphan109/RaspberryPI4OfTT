@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
     <meta name="color-scheme" content="light dark">
     <title>Raspberry Pi 4 — Bảng điều khiển</title>
     <link rel="icon" href="{{url_for('static',filename='raspberry-pi.png',v=asset_version)}}">
@@ -10,6 +10,8 @@
     <script src="{{url_for('static',filename='theme.js',v=asset_version)}}"></script>
     <link rel="stylesheet" href="{{url_for('static',filename='dashboard.css',v=asset_version)}}">
     <link rel="stylesheet" href="{{url_for('static',filename='studio.css',v=asset_version)}}">
+    <link rel="stylesheet" href="{{url_for('static',filename='camera.css',v=asset_version)}}">
+    <link rel="stylesheet" href="{{url_for('static',filename='mobile.css',v=asset_version)}}" media="(max-width: 760px)">
 
 </head>
 <body>
@@ -123,6 +125,7 @@
 
 {% else %}
 <a id="ui-skip" class="skip-link" href="#main-content">Đến nội dung chính</a>
+{% include 'mobile.html' %}
 <div class="app-layout">
 
     <!-- Sidebar Navigation -->
@@ -752,11 +755,11 @@
 <script src="{{url_for('static',filename='audio.js',v=asset_version)}}" defer></script>
 <script src="{{url_for('static',filename='quick-audio.js',v=asset_version)}}" defer></script>
 <script src="{{url_for('static',filename='media-library.js',v=asset_version)}}" defer></script>
-<link rel="stylesheet" href="{{url_for('static',filename='camera.css',v=asset_version)}}">
 <script src="{{url_for('static',filename='camera.js',v=asset_version)}}" defer></script>
 <input type="hidden" id="ops-csrf" value="{{csrf}}">
 <script src="{{url_for('static',filename='operations.js',v=asset_version)}}" defer></script>
 <script src="{{url_for('static',filename='storage-writes.js',v=asset_version)}}" defer></script>
+<script src="{{url_for('static',filename='mobile.js',v=asset_version)}}" defer></script>
 {% endif %}
 
 </body>

@@ -8,6 +8,7 @@
 .history-legend span:nth-child(1){color:var(--chart-cpu)}.history-legend span:nth-child(2){color:var(--chart-ram)}.history-legend span:nth-child(3){color:var(--chart-temp)}
 .traffic-chart,#history-chart{width:100%;display:block;overflow:visible;background:var(--bg-surface-subtle)}
 #sd-rate-path{fill:none;stroke:var(--chart-tx);stroke-width:2;vector-effect:non-scaling-stroke}.chart-dot.sd-rate-path{fill:var(--chart-tx)}#sd-daily-bars rect{fill:var(--chart-rx)}
+.mobile-shell{display:none}
 /* Pi Control 4 — compact device console. Base primitives: dashboard.css.
    One composition layer; no page zoom, CSS scaling or hidden functional panels. */
 :root{

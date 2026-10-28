@@ -38,6 +38,7 @@ jobs:
           node --check pi-control/static/camera.js
           node pi-control/tests/test_camera_polling.js
           node pi-control/tests/test_interface.js
+          node pi-control/tests/test_mobile.js
           node pi-control/tests/test_feedback.js
           node pi-control/tests/test_events_ui.js
           node pi-control/tests/test_spotify_js.js
