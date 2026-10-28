@@ -441,7 +441,7 @@ if(!window.__piBluetoothMuted)window.__piBluetoothMuted=new Map();
 const hold=v=>{if(!window.__piBluetoothHold||!(v instanceof HTMLMediaElement))return;
 if(!window.__piBluetoothMuted.has(v))window.__piBluetoothMuted.set(v,v.muted);v.muted=true;v.pause()};
 if(!window.__piBluetoothHoldInstalled){document.addEventListener('play',e=>hold(e.target),true);window.__piBluetoothHoldInstalled=true}
-document.querySelectorAll('audio,video').forEach(hold);return true})()"""
+const elements=[...document.querySelectorAll('audio,video')];elements.forEach(hold);return elements.length})()"""
 SAFETY_RELEASE_JS="""(()=>{window.__piBluetoothHold=false;
 for(const [v,muted] of window.__piBluetoothMuted||[])v.muted=muted;
 window.__piBluetoothMuted?.clear();return true})()"""
@@ -458,7 +458,13 @@ def hold_bluetooth():
     if GUARD_SCRIPT is None:
         GUARD_SCRIPT=cdp('Page.addScriptToEvaluateOnNewDocument',{'source':SAFETY_MUTE_JS})['identifier']
         GUARD_TARGET=page
-    evaluate(SAFETY_MUTE_JS)
+    held=evaluate(SAFETY_MUTE_JS)
+    if held==0 and PROVIDER=='spotify':
+        # Spotify may own detached audio that DOM muting cannot reach. Closing
+        # this dedicated browser is the bounded safety fallback for that case.
+        set_power(False)
+        BT_GUARD.message='Đã cho Media nghỉ vì không xác minh được việc tắt tiếng Spotify. Chọn đầu ra rồi bật Media và bấm Phát.'
+        return
     if changed or not GUARD_FILE.exists():
         pending=GUARD_FILE.with_suffix('.tmp')
         with pending.open('x') as stream:
@@ -471,6 +477,8 @@ def release_bluetooth():
     if not BT_GUARD.latched:return
     BT_GUARD.resume()
     try:
+        if STANDBY:
+            GUARD_SCRIPT=None;GUARD_TARGET='';GUARD_FILE.unlink(missing_ok=True);return
         if GUARD_SCRIPT:
             if not GUARD_TARGET or target()['id']==GUARD_TARGET:
                 cdp('Page.removeScriptToEvaluateOnNewDocument',{'identifier':GUARD_SCRIPT})

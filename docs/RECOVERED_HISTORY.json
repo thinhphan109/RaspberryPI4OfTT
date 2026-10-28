@@ -258,6 +258,19 @@
       "bundle": "pi-control-ssd-20261028-r5b",
       "manifest_sha256": "0a2d200c4e70626ec570e44e85f8cb238233cad6564c75099e915b785cee11ea",
       "files": 42
+    },
+    {
+      "kind": "module-payload",
+      "timestamp": 1793179002,
+      "date": "2026-10-28T16:16:42+07:00",
+      "title": "fix(history): Recover media v1-f879390b6518f0aa",
+      "event_id": "c98a72ea3e394c3e8ad5f4b3601ad527",
+      "module": "media",
+      "release": "v1-f879390b6518f0aa",
+      "source_hash": "f879390b6518f0aac331c07f4ec73de7cb845c9098fbeab3b4bc1f7d65017780",
+      "bundle": "pi-control-ssd-20261028-r5c",
+      "manifest_sha256": "5a9a7eb7f52e9d21b8f3f6a2ac87babcc393f22e0ab074edcc2e8bbd2aae4b6b",
+      "files": 7
     }
   ]
 }
