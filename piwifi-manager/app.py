@@ -18,7 +18,7 @@ import hmac
 import secrets
 import socket
 import time
-from copy import deepcopy
+from read_cache import ReadCache
 from pathlib import Path
 from observer import current as collect, history, events, activity, ipc_read
 from state import read as read_state
@@ -50,16 +50,10 @@ def service_help_context():
 WEB_USER = os.environ.get("PIWIFI_USER", "admin")
 WEB_PASS = os.environ.get("PIWIFI_PASS", "")
 HELPER = "/usr/local/sbin/piwifi-helper"
-_read_cache = {}
+_read_cache = ReadCache()
 
 def cached_read(key, ttl, function):
-    now = time.monotonic()
-    old = _read_cache.get(key)
-    if old and now - old[0] < ttl:
-        return deepcopy(old[1])
-    value = function()
-    _read_cache[key] = (now, deepcopy(value))
-    return value
+    return _read_cache.read(key, ttl, function)
 
 
 def helper(*args):
@@ -308,7 +302,7 @@ def logout():
 @app.route("/")
 def index():
     try:
-        data = helper("status")
+        data = cached_read('network', 60, lambda:helper('status'))
         error = None
     except Exception as e:
         data = {

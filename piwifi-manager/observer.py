@@ -12,6 +12,7 @@ from state import read
 from collections import deque
 import threading
 import socketserver
+import http.client
 from security import status as security_status
 from storage_writes import WriteTracker, system_sample
 from system_events import SystemMonitor
@@ -177,12 +178,16 @@ def diagnostics(status):
         except OSError:
             pass
         add('Internet', 'ok' if internet else 'unknown', 'TCP 1.1.1.1:443; một đích thử không chứng minh toàn bộ Internet')
+    web = http.client.HTTPConnection('127.0.0.1', 18765, timeout=2)
     try:
-        with socket.create_connection(('127.0.0.1', 18765), timeout=2):
-            web_ok = True
-    except OSError:
+        web.request('GET', '/login', headers={'Connection': 'close'})
+        response = web.getresponse()
+        web_ok = response.status == 200
+    except (OSError, http.client.HTTPException):
         web_ok = False
-    add('Dashboard', 'ok' if web_ok else 'failed', 'Cổng ứng dụng 18765 trên Pi')
+    finally:
+        web.close()
+    add('Dashboard', 'ok' if web_ok else 'failed', 'HTTP /login trên Pi; yêu cầu phản hồi 200')
     return dict(timestamp=int(time.time()), layers=layers, scope='DNS và Internet theo tuyến mặc định của hệ thống')
 
 def _run():

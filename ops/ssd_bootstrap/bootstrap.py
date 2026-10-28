@@ -172,7 +172,7 @@ def units(module,config):
     user=config['desktop_user'];uid=config['desktop_uid'];base=f'/opt/pi-control/{module}/current'
     common='Restart=on-failure\nRestartSec=3\nEnvironment=PYTHONDONTWRITEBYTECODE=1\n'
     install='\n[Install]\nWantedBy=multi-user.target\n'
-    if module=='dashboard':return {'pi-control-dashboard.service':f'[Unit]\nDescription=Pi Control Dashboard and API\nAfter=network.target\n[Service]\nUser={user}\nGroup={user}\nWorkingDirectory={base}\nEnvironmentFile=/etc/pi-control/dashboard/auth.env\nExecStart=/usr/bin/gunicorn --workers 1 --bind 0.0.0.0:18765 --error-logfile - app:app\nPrivateTmp=true\n{common}'+install+'Alias=piwifi-web.service\n'}
+    if module=='dashboard':return {'pi-control-dashboard.service':f'[Unit]\nDescription=Pi Control Dashboard and API\nAfter=network.target\n[Service]\nUser={user}\nGroup={user}\nWorkingDirectory={base}\nEnvironmentFile=/etc/pi-control/dashboard/auth.env\nExecStart=/usr/bin/gunicorn --workers 1 --worker-class gthread --threads 4 --worker-connections 32 --worker-tmp-dir /dev/shm --bind 0.0.0.0:18765 --error-logfile - app:app\nPrivateTmp=true\n{common}'+install+'Alias=piwifi-web.service\n'}
     if module=='network':return {
         'pi-control-network-guard.service':'[Unit]\nDescription=Pi Control Wi-Fi recovery guard\nAfter=NetworkManager.service\nRequires=NetworkManager.service\n[Service]\nType=oneshot\nExecStart=/usr/local/sbin/piwifi-guard\nTimeoutStartSec=180\n[Install]\nAlias=piwifi-guard.service\n',
         'pi-control-network-guard.timer':'[Unit]\nDescription=Pi Control network recovery schedule\n[Timer]\nOnBootSec=60\nOnUnitInactiveSec=30\nUnit=pi-control-network-guard.service\n[Install]\nWantedBy=timers.target\nAlias=piwifi-guard.timer\n'}

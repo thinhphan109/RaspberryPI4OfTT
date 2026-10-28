@@ -4,7 +4,7 @@
     "dashboard": {
       "label": "Dashboard và API", "kind": "managed", "requires": ["network", "observer"],
       "packages": ["python3-flask", "gunicorn", "openssl", "python3-yaml"],
-      "files": ["app.py", "hub.py", "hardware.py", "metrics.py", "observer.py", "state.py", "security.py", "media.py", "camera.py", "audio_client.py", "storage_writes.py", "system_events.py", "deployment_history.py", "service_catalog.py", "service_catalog.json", "runtime_config.py", "apps.json", "templates", "static"],
+      "files": ["app.py", "read_cache.py", "hub.py", "hardware.py", "metrics.py", "observer.py", "state.py", "security.py", "media.py", "camera.py", "audio_client.py", "storage_writes.py", "system_events.py", "deployment_history.py", "service_catalog.py", "service_catalog.json", "runtime_config.py", "apps.json", "templates", "static"],
       "services": [{"id":"dashboard","unit":"pi-control-dashboard.service","legacy_unit":"piwifi-web.service","scope":"system","activation":"continuous","label":"Dashboard Pi Control","purpose":"Phục vụ trang quản lý và API; gửi yêu cầu tới các agent riêng.","stop_impact":"Mất trang quản lý; Wi-Fi, DNS, Media và Camera vẫn tiếp tục chạy.","normal_inactive":"Chỉ bình thường khi chủ động tắt giao diện.","dependencies":["network"]}]
     },
     "network": {
