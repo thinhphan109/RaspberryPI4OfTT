@@ -117,10 +117,11 @@ class OperationsTests(unittest.TestCase):
         self.assertLessEqual(len(points),360)
         self.assertEqual(points[0]['cpu'],99)
     def test_hotspot_diagnostics_skip_external_probes(self):
-        with patch.object(observer.subprocess,'run') as run,patch.object(observer.socket,'create_connection') as sock:
+        with patch.object(observer.subprocess,'run') as run,patch.object(observer.http.client,'HTTPConnection') as web:
             data=observer.diagnostics({'active':'Pi-Fallback','ip':'192.168.50.1/24'})
         run.assert_not_called()
-        sock.assert_called_once_with(('127.0.0.1',18765),timeout=2)
+        web.assert_called_once_with('127.0.0.1',18765,timeout=2)
+        web.return_value.request.assert_called_once_with('GET','/login',headers={'Connection':'close'})
         self.assertEqual([l['state'] for l in data['layers'][2:5]],['na']*3)
     def test_throttling_flags_distinguish_current_from_past(self):
         from types import SimpleNamespace

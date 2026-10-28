@@ -1,0 +1,93 @@
+// Exercise the actual camera UI lifecycle: no viewing traffic while hidden.
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const nodes=new Map(),listeners={},timers=new Map(),beacons=[];let next=0,calls=[];
+function element(id){if(nodes.has(id))return nodes.get(id);const node={dataset:{},value:'',style:{},disabled:false,hidden:false,checked:false,open:false,options:[],children:[],handlers:{},classList:{contains:()=>false},addEventListener(n,f){(this.handlers[n]??=[]).push(f)},getContext:()=>({clearRect(){},fillRect(){},strokeRect(){},fillText(){}}),replaceChildren(...children){this.options=children;this.children=children},append(...children){this.children.push(...children)},removeAttribute(name){delete this[name]},setPointerCapture(){},showModal(){this.open=true},close(){this.open=false;for(const fn of this.handlers.close||[])fn()}};nodes.set(id,node);return node;}
+const document={hidden:false,getElementById:element,addEventListener:(name,fn)=>(listeners[name]??=[]).push(fn),createElement:()=>element('new-'+next++)};
+const window={addEventListener:document.addEventListener};
+const cameraState={enabled:false,available:false,automatic:true,recording:false,rendering:false,mounts:[]};
+const cameraRows=[{id:'20261024T140545-e84c6aa5',storage:'/mnt/ssd',frames:3,state:'ready',video:true}];let holdPhoto=null;
+const context={document,window,crypto:{getRandomValues:array=>array.fill(10)},navigator:{sendBeacon:(url,body)=>{beacons.push({url,body});return true}},Blob,AbortSignal,AbortController,URL,console,setTimeout,clearTimeout,confirm:()=>false,
+ Option:class {constructor(label,value){this.label=label;this.value=value}},
+ fetch:async(url,options)=>{calls.push({url,payload:options?.body?JSON.parse(options.body):null});if(holdPhoto&&url.includes('/photo/'))await new Promise(resolve=>holdPhoto.resolve=resolve);return {ok:true,redirected:false,blob:async()=>new Blob(['jpeg']),json:async()=>({ok:true,data:url.includes('/photos/')?{indices:[0,2,9],total:3}:options?.body&&JSON.parse(options.body).action==='list'?cameraRows:cameraState})}},
+ setInterval:(fn,ms)=>{let id=++next;timers.set(id,{fn,ms});return id},clearInterval:id=>timers.delete(id)};
+element('camera-mode').value='interval';element('ops-csrf').value='test-token';
+vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'../static/camera.js'),'utf8'),context);
+function event(name,detail){for(const listener of listeners[name]||[])listener({detail});}
+const flush=()=>new Promise(resolve=>setImmediate(resolve));
+(async()=>{
+ assert.equal(timers.size,0);assert.equal(calls.length,0);
+ event('pi:view','camera');await flush();assert.equal(timers.size,4);
+ assert(calls.some(call=>call.payload?.action==='watch'&&call.payload.watching));
+ const row=cameraRows[0],card=()=>element('camera-library').children[0];
+ row.state='recording';row.frames=0;row.video=false;
+ cameraState.recording=true;cameraState.session={id:row.id,storage:row.storage,mode:'position',frames:2,duration:5};
+ cameraState.threshold=15;cameraState.settle=.2;cameraState.calibration_warning='Vùng mẫu quá rộng';
+ cameraState.tracking={phase:'waiting_departure',threshold:15,departure_threshold:22.5,recent_max:[11.6,10.8]};
+ await [...timers.values()].find(timer=>timer.ms===15000).fn();await flush();
+ await [...timers.values()].find(timer=>timer.ms===4000).fn();await flush();
+ assert.equal(element('camera-mode').value,'position','Another tab must show the active recording mode');
+ assert.equal(element('camera-position-settings').hidden,false);assert.equal(element('camera-interval-field').hidden,true);
+ assert.equal(element('camera-threshold').value,15);assert.equal(element('camera-settle').value,.2);
+ assert.equal(element('camera-threshold').disabled,true);
+ assert.equal(element('camera-calibration-warning').hidden,false);
+ assert.match(element('camera-tracking').textContent,/22.5%.*11.6 \/ 10.8%/);
+ assert.match(card().children[1].textContent,/2 ảnh.*Đang ghi$/);
+ assert.equal(card().children[2].children.find(node=>node.textContent==='Ghép ảnh gốc').hidden,true);
+ cameraState.session.frames=3;
+ const listCount=calls.filter(call=>call.payload?.action==='list').length;
+ await [...timers.values()].find(timer=>timer.ms===4000).fn();await flush();
+ assert.match(card().children[1].textContent,/3 ảnh.*Đang ghi$/);
+ assert.equal(calls.filter(call=>call.payload?.action==='list').length,listCount,'Counters use existing status, no additional library requests');
+ cameraState.recording=false;cameraState.rendering=true;cameraState.render_session={...cameraState.session};cameraState.session=null;
+ await [...timers.values()].find(timer=>timer.ms===4000).fn();await flush();
+ assert.match(card().children[1].textContent,/3 ảnh.*Đang ghép$/);assert.equal(element('camera-count').textContent,3);
+ cameraState.rendering=false;cameraState.render_session=null;row.state='interrupted';row.frames=null;
+ await [...timers.values()].find(timer=>timer.ms===15000).fn();await flush();
+ assert.match(card().children[1].textContent,/Chưa kiểm đếm ảnh.*Bị gián đoạn$/);
+ assert(!card().children[1].textContent.includes('0 ảnh'));
+ row.state='ready';row.frames=3;row.video=true;
+ await [...timers.values()].find(timer=>timer.ms===15000).fn();await flush();
+ cameraState.recording=false;cameraState.session=null;
+ cameraState.tracking=null;
+ element('camera-threshold').value='9';for(const fn of element('camera-threshold').handlers.input)fn();
+ await [...timers.values()].find(timer=>timer.ms===4000).fn();await flush();
+ assert.equal(element('camera-threshold').value,'9','Status cannot overwrite unsaved calibration edits');
+ assert.equal(element('camera-tracking').hidden,true);
+ cameraState.storage_uuid='SSD-123';cameraState.storage_default='/mnt/ssd';cameraState.mounts=[{path:'/mnt/ssd',uuid:'SSD-123',fs:'ntfs'}];
+ await [...timers.values()].find(timer=>timer.ms===2000)?.fn();await flush();
+ // A heartbeat also renders authoritative storage defaults.
+ await [...timers.values()].find(timer=>timer.ms===4000).fn();await flush();
+ assert.equal(element('camera-storage').value,'/mnt/ssd');
+ cameraState.storage_default=null;cameraState.mounts=[];
+ await [...timers.values()].find(timer=>timer.ms===4000).fn();await flush();
+ assert.equal(element('camera-storage').value,'missing');assert.equal(element('camera-record').disabled,true);
+ event('pi:view','overview');await flush();assert.equal(timers.size,0);assert.equal(beacons.length,1);
+ assert.equal(JSON.parse(await beacons[0].body.text()).watching,false);
+ assert.equal(JSON.parse(await beacons[0].body.text()).csrf,'test-token');
+ event('pi:view','camera');await flush();document.hidden=true;event('visibilitychange');await flush();
+ assert.equal(timers.size,0);assert.equal(beacons.length,2);
+ document.hidden=false;event('visibilitychange');await flush();assert.equal(timers.size,4);
+ event('pagehide');await flush();assert.equal(timers.size,0);assert.equal(beacons.length,3);
+ event('pageshow');await flush();assert.equal(timers.size,4,'BFCache restore restarts exactly one set of timers');
+ event('pi:view','overview');await flush();const before=calls.length;
+ event('visibilitychange');await flush();assert.equal(calls.length,before);
+ event('pi:view','camera');await flush();
+ const open=()=>element('camera-library').children[0].children[2].children.find(node=>node.textContent==='Xem ảnh').onclick();
+ const releases=beacons.length;await open();await flush();
+ assert.equal(element('camera-gallery').open,true);assert.equal(timers.size,0);assert.equal(beacons.length,releases+1);
+ assert.equal(element('camera-gallery-count').textContent,'Ảnh 1 / 3');
+ assert(calls.some(call=>call.url.includes('/photo/')&&call.url.includes('/0?')));
+ await element('camera-gallery-next').onclick();await flush();
+ assert.equal(element('camera-gallery-count').textContent,'Ảnh 2 / 3');assert(element('camera-gallery-download').href.includes('/2?'));
+ element('camera-gallery-jump').value='3';element('camera-gallery-jump').onchange();await flush();
+ assert.equal(element('camera-gallery-count').textContent,'Ảnh 3 / 3');assert.equal(element('camera-gallery-next').disabled,true);
+ const photoRequests=calls.filter(call=>call.url.includes('/photo/')).length;await flush();
+ assert.equal(calls.filter(call=>call.url.includes('/photo/')).length,photoRequests,'No gallery background polling');
+ holdPhoto={};element('camera-gallery-prev').onclick();await flush();
+ element('camera-gallery-close').onclick();const waiting=holdPhoto;holdPhoto=null;waiting.resolve();await flush();
+ assert.equal(element('camera-gallery').open,false);assert.equal(element('camera-gallery-image').hidden,true,'Late image cannot reopen closed gallery');assert.equal(timers.size,4);
+ await open();await flush();event('pagehide');await flush();assert.equal(timers.size,0);assert.equal(element('camera-gallery').open,false);
+ event('pageshow');await flush();assert.equal(timers.size,4);
+ event('pi:view','overview');await flush();assert.equal(timers.size,0);
+ console.log('Camera lifecycle, gallery actual-index navigation, download, no polling, stale-image cleanup and BFCache PASS');
+})().catch(error=>{console.error(error);process.exitCode=1});

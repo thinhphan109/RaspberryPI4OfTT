@@ -1,1 +1,0 @@
-[{"id": "dashboard", "name": "Pi Control", "description": "Dashboard và API", "service": "pi-control-dashboard", "port": 18765, "path": "/", "public_url": null}, {"id": "adguard", "name": "AdGuard Home", "description": "DNS lọc tên miền", "service": "adguardhome", "loopback": true, "port": 18853, "path": "/", "public_url": null}]

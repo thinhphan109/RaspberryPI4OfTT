@@ -17,6 +17,9 @@ PrivateTmp=true
 Environment=PYTHONDONTWRITEBYTECODE=1
 ProtectSystem=strict
 ProtectHome=true
+# Keep home protection; expose the existing user's runtime IPC through a read-only alias.
+BindReadOnlyPaths=-/run/user/1000:/run/piwifi-camera-runtime
+Environment=PIWIFI_CAMERA_RUNTIME=/run/piwifi-camera-runtime
 
 [Install]
 WantedBy=multi-user.target

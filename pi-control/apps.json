@@ -1,0 +1,5 @@
+[
+  {"id":"dashboard","name":"Bảng điều khiển Pi","description":"Mạng, tài nguyên và phục hồi hệ thống","service":"piwifi-web","port":18765,"path":"/","public_url":"https://rasp4.thinhme.tech/"},
+  {"id":"adguard","name":"AdGuard Home","description":"DNS lọc tên miền, nhật ký trong RAM và DNS upstream mã hóa","service":"adguardhome","port":18853,"path":"/","public_url":null},
+  {"id":"edgevision","name":"EdgeVision Camera","description":"Bàn thử camera và bộ dữ liệu; chỉ mở trên Pi qua SSH tunnel","service":"edgevision-camera","user_service":true,"loopback":true,"port":18766,"path":"/","public_url":null}
+]

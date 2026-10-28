@@ -1,0 +1,17 @@
+[Unit]
+Description=Private Pi webcam and timelapse agent
+
+[Service]
+ExecStart=/usr/bin/python3 -B /opt/piwifi-web/camera_agent.py
+Restart=on-failure
+RestartSec=3
+UMask=0077
+Environment=PYTHONDONTWRITEBYTECODE=1
+MemoryMax=512M
+CPUQuota=100%
+NoNewPrivileges=true
+TimeoutStopSec=8
+KillMode=control-group
+
+[Install]
+WantedBy=default.target

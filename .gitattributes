@@ -7,9 +7,9 @@
 *.md text eol=lf
 *.service text eol=lf
 *.timer text eol=lf
-piwifi-manager/helper/* text eol=lf
-piwifi-manager/sudoers/* text eol=lf
-piwifi-manager/systemd/90-piwifi-dns text eol=lf
+pi-control/helper/* text eol=lf
+pi-control/sudoers/* text eol=lf
+pi-control/systemd/90-piwifi-dns text eol=lf
 ops/baseline/piwifi-helper text eol=lf
 ops/baseline/wifi-fallback-guard text eol=lf
 ops/vendor/log2ram/log2ram text eol=lf

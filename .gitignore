@@ -14,7 +14,7 @@ Thumbs.db
 *.pdf
 /ops/screenshots/
 /docs/pihole-qa/
-/piwifi-manager/docs/screenshots/
+/pi-control/docs/screenshots/
 /ops/reports/
 /ops/*proof*.png
 /ops/dashboard-*.png
@@ -44,3 +44,4 @@ credentials/
 *.pickey
 /backups/
 /restore-test/
+/ops/ssd-kits/

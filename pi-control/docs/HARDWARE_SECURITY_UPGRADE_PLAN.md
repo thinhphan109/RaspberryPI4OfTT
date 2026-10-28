@@ -150,4 +150,4 @@ Quy tắc người dùng bổ sung ngày 14/10/2026 có ưu tiên cao hơn chín
 - [Linux thermal sysfs: type/max_state/cur_state](https://cdn.kernel.org/doc/html/latest/driver-api/thermal/sysfs-api.html).
 - [libgpiod request_lines](https://libgpiod.readthedocs.io/en/v2.3/python_misc.html).
 - [systemd journalctl: JSON/cursor](https://www.freedesktop.org/software/systemd/man/255/journalctl.html).
-- Quy trình local: ops/README.md và piwifi-manager/docs/V31_RELEASE.md.
+- Quy trình local: ops/README.md và pi-control/docs/V31_RELEASE.md.

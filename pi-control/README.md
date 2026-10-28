@@ -1,8 +1,19 @@
-# Raspberry Pi Dashboard
+# Pi Control — hệ thống quản lý Raspberry Pi
 
-Dashboard tổng hợp nhiệt độ, CPU/RAM, swap, uptime, dung lượng ổ đĩa và trạng thái dịch vụ, kết hợp quản lý Wi-Fi. Xem `docs/DASHBOARD.md` để biết cơ chế guard, phục hồi và phạm vi kiểm chứng.
+Source cho Dashboard, giám sát hệ thống, Wi-Fi fallback, DNS, Spotify/YouTube,
+âm thanh/Bluetooth, webcam/timelapse và GPIO chỉ đọc.
 
-Web UI quản lý Wi-Fi cho Raspberry Pi 4 chạy Debian 13 / Raspberry Pi OS với NetworkManager.
+Thư mục source đổi từ `piwifi-manager` sang `pi-control` ngày28/10/2026. Tên
+workspace Windows vẫn là `G:\RaspberryPI4OfTT`; mở `Pi-Control.cmd` ở thư mục gốc
+để dùng bộ công cụ vận hành.
+
+## Hệ thống SSD hiện tại
+
+Mỗi module có release và service riêng trong `/opt/pi-control/<module>`.
+Đọc [runbook SSD](../ops/ssd_bootstrap/README.md),
+[báo cáo hệ thống](docs/AUDIT_20261028.md) và [Media hiện tại](docs/MEDIA_R5.md).
+Không chạy Deploy legacy lên OS SSD. Các mục kiến trúc/triển khai legacy bên
+dưới mô tả OS SD cũ và được giữ để tra cứu.
 
 ## Kiến trúc
 
@@ -21,7 +32,7 @@ Web app chạy bằng user thường (`thinh` theo cấu hình hiện tại). Ch
 ## Cấu trúc source
 
 ```text
-piwifi-manager/
+pi-control/
 ├── app.py
 ├── templates/index.html
 ├── helper/piwifi-helper

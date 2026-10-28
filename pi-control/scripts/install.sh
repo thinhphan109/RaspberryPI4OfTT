@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 [[ $EUID -eq 0 ]] || { echo 'Run through ops/pi.ps1 -Action Deploy'; exit 1; }
+[[ ! -f /etc/pi-control/runtime.json ]] || { echo 'Modular SSD system: use the SSD bootstrap installer'; exit 1; }
 [[ ${PIWIFI_DEPLOY_LOCKED:-0} == 1 ]] || { echo 'Use the snapshot/lock deployment entrypoint'; exit 1; }
 APP_USER="${SUDO_USER:-thinh}"
 APP_GROUP="$(id -gn "$APP_USER")"
@@ -12,13 +13,16 @@ python3 -c 'import flask' >/dev/null 2>&1 && command -v gunicorn >/dev/null && c
 command -v iw >/dev/null || { apt update; apt install -y iw; }
 python3 -c 'import yaml' >/dev/null 2>&1 || { apt update; apt install -y python3-yaml; }
 python3 -c 'import websocket' >/dev/null 2>&1 || { apt update; apt install -y python3-websocket; }
+python3 -c 'from PIL import Image' >/dev/null 2>&1 && command -v ffmpeg >/dev/null || { apt update; apt install -y python3-pil ffmpeg; }
 [[ ! -L "$RELEASE_ROOT" ]] || exit 1
 install -d -o root -g root -m 0755 "$RELEASE_ROOT"
 [[ ! -e "$release" ]] || { echo 'Release already exists'; exit 1; }
 install -d -o root -g root -m 0755 "$release/templates" "$release/static/fonts" "$release/helper"
-install -o root -g root -m 0644 app.py hub.py media.py media_agent.py media_policy.py audio_control.py storage_writes.py apps.json metrics.py observer.py state.py mcp_server.py hardware.py security.py "$release/"
+install -o root -g root -m 0644 app.py read_cache.py runtime_config.py audio_agent.py audio_client.py camera_renderer.py render_jobs.py service_catalog.py service_catalog.json deployment_history.py hub.py media.py media_agent.py media_policy.py media_extras.py media_catalog.py youtube_quality.py spotify_player.py audio_control.py camera.py camera_agent.py camera_policy.py storage_writes.py system_events.py apps.json metrics.py observer.py state.py mcp_server.py hardware.py security.py "$release/"
 install -o root -g root -m 0644 templates/index.html "$release/templates/"
-install -o root -g root -m 0644 static/dashboard.css static/studio.css static/charts.js static/dashboard.js static/hub.js static/media.js static/audio.js static/storage-writes.js static/operations.js static/hardware.js static/theme.js static/raspberry-pi.png "$release/static/"
+install -o root -g root -m 0644 templates/camera.html templates/help.html "$release/templates/"
+install -o root -g root -m 0644 static/camera.js static/camera.css static/interface.js static/service-help.js "$release/static/"
+install -o root -g root -m 0644 static/dashboard.css static/studio.css static/charts.js static/dashboard.js static/hub.js static/media.js static/quick-audio.js static/media-library.js static/audio.js static/storage-writes.js static/operations.js static/hardware.js static/theme.js static/raspberry-pi.png "$release/static/"
 install -o root -g root -m 0644 static/fonts/noto-sans.woff2 static/fonts/OFL.txt "$release/static/fonts/"
 install -o root -g root -m 0644 static/fonts/jetbrains-mono.woff2 static/fonts/JetBrainsMono-OFL.txt "$release/static/fonts/"
 install -o root -g root -m 0755 helper/piwifi-helper helper/piwifi-guard helper/piwifi-dns-sync "$release/helper/"
@@ -28,7 +32,7 @@ for unit in piwifi-web piwifi-observer piwifi-guard; do
   sed -e "s/^User=thinh$/User=${APP_USER}/" -e "s/^Group=thinh$/Group=${APP_GROUP}/" "systemd/$unit.service" > "$release/$unit.service"
 done
 install -o root -g root -m 0644 systemd/piwifi-guard.timer "$release/piwifi-guard.timer"
-install -o root -g root -m 0644 systemd/pi-media.service systemd/pi-media-browser.service "$release/"
+install -o root -g root -m 0644 systemd/pi-media.service systemd/pi-media-browser.service systemd/pi-camera.service "$release/"
 systemctl stop piwifi-guard.timer piwifi-guard.service piwifi-observer piwifi-web
 if [[ -L "$APP_DIR" ]]; then
   previous="$(readlink -f "$APP_DIR")"
@@ -74,9 +78,12 @@ echo "Activated complete release: $release"
 # Session agent runs as the desktop user, never root. Browser starts only on request.
 install -d -m 0755 /etc/systemd/user
 install -o root -g root -m 0644 "$release/pi-media.service" "$release/pi-media-browser.service" /etc/systemd/user/
+install -o root -g root -m 0644 "$release/pi-camera.service" /etc/systemd/user/
 uid="$(id -u "$APP_USER")"
 if [[ -S /run/user/$uid/bus ]]; then
   runuser -u "$APP_USER" -- env XDG_RUNTIME_DIR="/run/user/$uid" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" systemctl --user daemon-reload
   runuser -u "$APP_USER" -- env XDG_RUNTIME_DIR="/run/user/$uid" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" systemctl --user enable pi-media
   runuser -u "$APP_USER" -- env XDG_RUNTIME_DIR="/run/user/$uid" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" systemctl --user restart pi-media
+  runuser -u "$APP_USER" -- env XDG_RUNTIME_DIR="/run/user/$uid" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" systemctl --user enable pi-camera
+  runuser -u "$APP_USER" -- env XDG_RUNTIME_DIR="/run/user/$uid" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" systemctl --user restart pi-camera
 fi
