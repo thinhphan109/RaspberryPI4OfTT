@@ -8,7 +8,7 @@
  function powerControls(){
   document.querySelectorAll('[data-media-power]').forEach(b=>b.disabled=busy||(b.dataset.mediaPower==='off'?standby:!standby&&connected));
   $('media-start').disabled=busy;
-  document.querySelectorAll('[data-media],#media-play,#media-dislike,#media-volume').forEach(b=>{if(!b.matches('[data-media="clear"],[data-media="remove"]'))b.disabled=busy||standby});
+  document.querySelectorAll('[data-media],#media-play,#media-dislike,#media-volume').forEach(b=>{if(!b.matches('[data-media="clear"],[data-media="remove"]'))b.disabled=busy||(standby&&b.id!=='media-play')});
   document.querySelectorAll('[data-media-source]').forEach(b=>{b.disabled=busy||standby;b.setAttribute('aria-pressed',String(b.dataset.mediaSource===provider))});
   $('media-spotify-login').disabled=busy||standby;$('media-spotify-filter').disabled=busy;
   if(provider==='spotify'){
@@ -48,7 +48,7 @@
   $('media-spotify-account').hidden=provider!=='spotify';
   $('media-spotify-account-state').textContent=d.login_required?'Chờ đăng nhập trên Pi':d.has_video?'Đã nhận bộ phát':'Spotify Free · đăng nhập khi cần';
   $('media-spotify-filter').checked=d.spotify_ad_filter!==false;
-  $('media-url-label').textContent=provider==='spotify'?'Link bài hát / playlist Spotify':'Link video / playlist YouTube';
+  $('media-url-label').textContent='Link YouTube / Spotify · tự nhận nguồn';
   $('media-url').placeholder=provider==='spotify'?'https://open.spotify.com/playlist/…':'https://www.youtube.com/watch?v=…';
   $('media-search').href=provider==='spotify'?'https://open.spotify.com/':'https://www.youtube.com/';
   $('media-search').textContent=provider==='spotify'?'Tìm trên Spotify ↗':'Tìm video trên YouTube ↗';
@@ -68,6 +68,8 @@
   $('media-title').textContent=(d.title||'Chưa có nội dung')+(provider==='spotify'&&d.artist?' · '+d.artist:'');
   $('media-state').textContent=(standby?'Đang nghỉ':!d.connected?'Chưa kết nối':d.login_required?'Chờ đăng nhập':d.ad?(d.ad_muted?'Đã tắt tiếng quảng cáo':'Đang quảng cáo'):!d.has_video?'Chọn nội dung để bắt đầu':d.paused?'Đã tạm dừng':'Đang phát')+(d.autoplay?' · Tự phát':'');
   $('media-state').className='badge '+(d.connected?'badge-success':'badge-warning');
+  if(d.launch_pending)$('media-state').textContent='Đang mở nội dung…';
+  if(d.content_unavailable){$('media-state').textContent='Nội dung không khả dụng';$('media-state').className='badge badge-warning'}
   if(provider==='spotify'&&d.has_video&&!d.paused&&d.playback_observed===false){$('media-state').textContent='Player báo đang phát · chưa xác minh âm thanh';$('media-state').className='badge badge-warning'}
   if(guard?.paused){$('media-state').textContent='Tạm dừng · kiểm tra loa';$('media-state').className='badge badge-warning'}
   $('media-toggle').textContent=d.paused?'▶ Phát':'Ⅱ Tạm dừng';
@@ -101,12 +103,12 @@
   (d.queue||[]).forEach((url,index)=>{const li=document.createElement('li'),a=document.createElement('a'),b=document.createElement('button');a.textContent='Video '+(index+1)+' · '+url.split('v=')[1];a.href=url;a.target='_blank';a.rel='noopener';b.textContent='Bỏ';b.className='btn btn-outline';b.onclick=()=>command({action:'remove',index});li.append(a,b);$('media-queue').append(li)});
   if(!(d.queue||[]).length){const li=document.createElement('li');li.textContent='Chưa có video trong hàng đợi.';$('media-queue').append(li)}
   const receipt=d.command;lastReceipt=receipt;
-  if(d.error||d.notice){feedback(d.error||d.notice,d.error?'error':'info');lastWarning=true}
+  if(d.error||d.notice){feedback(d.error||d.notice,d.error||d.content_unavailable?'error':'info');lastWarning=true}
   else if(receipt){const stamp=receipt.id+':'+receipt.state;if(stamp!==receiptStamp){receiptStamp=stamp;feedback(receipt.message,receipt.state==='confirmed'?'success':receipt.state==='unconfirmed'?'error':'info')}lastWarning=false}
   else if(lastWarning){feedback('');lastWarning=false}
  }
  async function refresh(){if(loading||busy||!visible())return;loading=true;const version=revision;try{const d=await api();if(version===revision&&!busy&&visible())render(d)}catch(e){if(version===revision&&!busy){$('media-state').textContent='Mất kết nối';$('media-state').className='badge badge-warning';feedback(e.message,'error')}}finally{loading=false}}
- async function command(payload){if(busy)return null;busy=true;revision++;powerControls();const controls=$('media').querySelectorAll('button');controls.forEach(b=>b.disabled=true);feedback('Đang gửi yêu cầu…');try{const result=await api(payload);render(result);if(!result.error&&!result.notice&&!result.command)feedback('Đã nhận yêu cầu; đang chờ trạng thái player.');return result}catch(e){if(lastReceipt)receiptStamp=lastReceipt.id+':'+lastReceipt.state;feedback(e.message,'error');$('resource-mode-state').textContent=e.message;return null}finally{busy=false;controls.forEach(b=>b.disabled=false);powerControls()}}
+ async function command(payload){if(busy){feedback('Đang xử lý thao tác trước; chờ một chút rồi thử lại.');return null}busy=true;revision++;powerControls();const controls=[...$('media').querySelectorAll('button')].filter(b=>!b.closest?.('.media-catalog'));controls.forEach(b=>b.disabled=true);feedback('Đang gửi yêu cầu…');try{const result=await api(payload);render(result);if(!result.error&&!result.notice&&!result.command)feedback('Đã nhận yêu cầu; đang chờ trạng thái player.');return result}catch(e){if(lastReceipt)receiptStamp=lastReceipt.id+':'+lastReceipt.state;feedback(e.message,'error');$('resource-mode-state').textContent=e.message;return null}finally{busy=false;controls.forEach(b=>b.disabled=false);powerControls()}}
  document.querySelectorAll('[data-media-power]').forEach(b=>b.onclick=()=>command({action:'power',enabled:b.dataset.mediaPower==='on'}));
  $('media-start').onclick=()=>command({action:'start'});
  document.querySelectorAll('[data-media-source]').forEach(b=>b.onclick=()=>command({action:'source',provider:b.dataset.mediaSource}));

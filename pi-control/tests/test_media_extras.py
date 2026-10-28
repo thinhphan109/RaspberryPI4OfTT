@@ -83,8 +83,8 @@ class ReceiptTests(unittest.TestCase):
 
     def test_play_requires_correct_provider_target_and_actual_playback(self):
         r = CommandReceipt(); r.begin('shortcut_play', {}, dict(provider='spotify', url=TRACK), now=1)
-        state = dict(provider='spotify', url=TRACK, connected=True, has_video=True, paused=False)
-        for changes in ({'provider':'youtube'}, {'url':VIDEO}, {'paused':True}, {'launch_pending':True}, {'login_required':True}):
+        state = dict(provider='spotify', url=TRACK, connected=True, has_video=True, paused=False,track_matches=True)
+        for changes in ({'provider':'youtube'}, {'url':VIDEO}, {'paused':True}, {'launch_pending':True}, {'login_required':True},{'track_matches':False}):
             self.assertEqual(r.observe(state|changes, now=2)['state'], 'pending')
         self.assertEqual(r.observe(state, now=3)['state'], 'confirmed')
 

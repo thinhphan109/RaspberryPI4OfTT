@@ -14,6 +14,7 @@ TRACK='https://open.spotify.com/track/1234567890ABCDEFGHIJKL'
 
 class SpotifyTests(unittest.TestCase):
     def setUp(self):
+        metadata=patch.object(s,'track_metadata',return_value=None);metadata.start();self.addCleanup(metadata.stop)
         temp=tempfile.TemporaryDirectory();self.addCleanup(temp.cleanup)
         scope=patch.multiple(m,PROVIDER='youtube',SPOTIFY_URL=s.HOME,SPOTIFY_AD_FILTER=True,SPOTIFY_PENDING=0,
                              LAST_URL='https://www.youtube.com/watch?v=abcdefghijk',STANDBY=False,NONSTOP=True,

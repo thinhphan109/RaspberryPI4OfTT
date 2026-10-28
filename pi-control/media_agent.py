@@ -14,7 +14,7 @@ import urllib.parse
 import urllib.request
 import websocket
 from media_policy import PlaybackPolicy
-from media_extras import Shortcuts, CommandReceipt, BluetoothGuard, youtube_destination, destination
+from media_extras import Shortcuts, CommandReceipt, BluetoothGuard, youtube_destination, destination, link_destination
 from runtime_config import modular, location, unit, desktop_runtime
 if not modular():import audio_control
 import spotify_player as spotify
@@ -149,7 +149,9 @@ def target():
     for p in rows:
         if spotify.is_page(p.get('url'),auth=True):return p
     for p in rows:
-        if p['url']=='about:blank':return p
+        # Chromium --app=about:blank can expose chrome://newtab/ on cold start.
+        # Only the dedicated profile's exact empty startup pages are eligible.
+        if p['url'] in ('about:blank','chrome://newtab/'):return p
     raise ValueError('Cửa sổ Media chưa ở YouTube/Spotify; kiểm tra desktop Pi')
 
 def cdp(method,params=None):
@@ -206,10 +208,10 @@ def set_power(enabled):
         if not STANDBY:
             current=status()
             if current.get('url'):
-                if PROVIDER=='spotify':SPOTIFY_URL=current['url']
+                if PROVIDER=='spotify':SPOTIFY_URL=current.get('context_url') or current['url']
                 else:LAST_URL=current['url']
             level=current.get('volume')
-            if current.get('has_video') and type(level) in (int,float) and math.isfinite(level) and 0<=level<=100:VOLUME=level
+            if current.get('has_video') and current.get('can_volume') is not False and type(level) in (int,float) and math.isfinite(level) and 0<=level<=100:VOLUME=level
         subprocess.run(['systemctl','--user','stop',unit('pi-media-browser')],check=True,timeout=8,capture_output=True)
         previous=STANDBY;STANDBY=True
         try:save_nonstop()
@@ -228,9 +230,9 @@ def resume_tick():
     if STANDBY or time.monotonic()>WAKE_UNTIL:
         WAKE_URL='';return
     if PROVIDER=='spotify':
-        install_volume_hook(limited_volume(VOLUME))
-        cdp('Page.navigate',{'url':spotify.url(WAKE_URL)})
-        if not MANUAL_PAUSE and not POLICY.sleep_state()['expired'] and WAKE_URL!=spotify.HOME:SPOTIFY_PENDING=time.monotonic()+45
+        if WAKE_URL==spotify.HOME:
+            install_volume_hook(limited_volume(VOLUME));cdp('Page.navigate',{'url':spotify.HOME})
+        else:spotify_dispatch(dict(action='play',url=WAKE_URL))
     elif WAKE_URL=='https://www.youtube.com/':cdp('Page.navigate',{'url':WAKE_URL})
     elif MANUAL_PAUSE or POLICY.sleep_state()['expired']:WAKE_URL='';return
     else:dispatch(dict(action='play',url=WAKE_URL))
@@ -351,16 +353,22 @@ def spotify_status():
     try:
         page=target()
         if not spotify.is_page(page.get('url')):
+            if not spotify.is_page(page.get('url'),auth=True):
+                return dict(common,notice='Chọn bài trong kết quả tìm kiếm hoặc dán link để bắt đầu.')
             return dict(common,connected=True,login_required=True,notice='Hoàn tất đăng nhập Spotify trực tiếp trên Pi; Dashboard không nhận mật khẩu.')
-        result=dict(common,**spotify.state(evaluate(spotify.STATE_JS)),connected=True,launch_pending=bool(SPOTIFY_PENDING))
-        try:result['context_url']=spotify.url(page.get('url'))
+        result=dict(common,**spotify.state(evaluate(spotify.state_script(SPOTIFY_URL))),connected=True,launch_pending=bool(SPOTIFY_PENDING))
+        try:result['context_url']=spotify.public_destination(page.get('url'))
         except ValueError:result['context_url']=''
         return result
     except Exception:return dict(common,notice='Chưa đọc được Spotify; bấm mở Spotify hoặc kiểm tra cửa sổ trên Pi.')
 
 
 def status():
-    data=player_status()
+    if WAKE_URL:
+        data=dict(provider=PROVIDER,standby=STANDBY,connected=False,launch_pending=True,title='Đang mở nội dung…',
+                  queue=list(QUEUE) if PROVIDER=='youtube' else [],nonstop=NONSTOP if PROVIDER=='youtube' else False,
+                  preferences=POLICY.summary(),volume_schedule=volume_policy(),spotify_ad_filter=SPOTIFY_AD_FILTER,error='')
+    else:data=player_status()
     try:data['shortcuts']=SHORTCUTS.rows()
     except (OSError,ValueError,TypeError,AttributeError):
         data['shortcuts']=[];data['shortcut_error']='Không đọc được danh sách ghim; dữ liệu hiện có được giữ nguyên.'
@@ -408,6 +416,7 @@ def spotify_dispatch(d):
         if not enabled and spotify.is_page(target().get('url')):spotify.ad_filter(evaluate,False,False)
     elif action=='play':
         destination=spotify.url(d.get('url'))
+        spotify.track_metadata(destination)
         if POLICY.sleep_state()['expired']:
             VOLUME=POLICY.sleep['volume'];POLICY.cancel_sleep()
         install_volume_hook(limited_volume(VOLUME))
@@ -436,7 +445,8 @@ def spotify_dispatch(d):
 def spotify_tick():
     global SPOTIFY_PENDING,ERROR
     s=spotify_status()
-    if not s.get('connected') or s.get('login_required'):return
+    if SPOTIFY_PENDING and (time.monotonic()>SPOTIFY_PENDING or s.get('content_unavailable')):SPOTIFY_PENDING=0
+    if not s.get('connected') or s.get('login_required') or s.get('content_unavailable'):return
     ERROR=''
     volume_tick(s)
     if sleep_tick(s):return
@@ -444,9 +454,11 @@ def spotify_tick():
     if SPOTIFY_PENDING:
         if time.monotonic()>SPOTIFY_PENDING:SPOTIFY_PENDING=0
         else:
-            try:matches=spotify.url(target()['url'])==SPOTIFY_URL
+            try:matches=spotify.public_destination(target()['url'])==SPOTIFY_URL
             except ValueError:matches=False
-            if matches and spotify.activate(evaluate):SPOTIFY_PENDING=0
+            if matches:
+                if s.get('url')==SPOTIFY_URL and s.get('track_matches') and not s.get('paused'):SPOTIFY_PENDING=0
+                elif spotify.activate(evaluate,SPOTIFY_URL):SPOTIFY_PENDING=0
     spotify.ad_filter(evaluate,SPOTIFY_AD_FILTER,s.get('ad',False))
 
 
@@ -562,10 +574,12 @@ def playlist_tick():
 
 def play_destination(provider, value):
     """One navigation per explicit selection; cold browser work is deferred."""
-    global PROVIDER,MANUAL_PAUSE,SPOTIFY_URL,WAKE_URL,WAKE_UNTIL
+    global PROVIDER,MANUAL_PAUSE,SPOTIFY_URL,WAKE_URL,WAKE_UNTIL,VOLUME,SPOTIFY_PENDING,YOUTUBE_PENDING
     value=destination(provider,value)
     if BT_GUARD.latched:release_bluetooth()
-    before=player_status()
+    before={}
+    if POLICY.sleep_state()['expired']:
+        VOLUME=POLICY.sleep['volume'];POLICY.cancel_sleep()
     if STANDBY:
         old_provider,old_pause,old_url=PROVIDER,MANUAL_PAUSE,SPOTIFY_URL
         PROVIDER=provider;MANUAL_PAUSE=False
@@ -574,8 +588,6 @@ def play_destination(provider, value):
         except Exception:
             PROVIDER,MANUAL_PAUSE,SPOTIFY_URL=old_provider,old_pause,old_url
             raise
-        WAKE_URL=value;WAKE_UNTIL=time.monotonic()+45
-        result=status()
     else:
         if PROVIDER!=provider:
             try:
@@ -583,11 +595,24 @@ def play_destination(provider, value):
                 else:evaluate('(()=>{const v=document.querySelector("video");if(v)v.pause();return true})()')
             except Exception:pass
             PROVIDER=provider
-        WAKE_URL=''
-        result=dispatch(dict(action='play',url=value))
+    MANUAL_PAUSE=False;SPOTIFY_PENDING=0;YOUTUBE_PENDING=None
+    WAKE_URL=value;WAKE_UNTIL=time.monotonic()+45
+    result=status()
     RECEIPT.begin('play',before,dict(provider=provider,url=value))
     result['command']=RECEIPT.observe(result)
     return result
+
+
+def search_browser():
+    """Explicit search may open a resting browser, without resuming old audio."""
+    global STANDBY,MANUAL_PAUSE,WAKE_URL,SPOTIFY_PENDING,YOUTUBE_PENDING
+    if not STANDBY:return
+    old_pause=MANUAL_PAUSE
+    STANDBY=False;MANUAL_PAUSE=True;WAKE_URL='';SPOTIFY_PENDING=0;YOUTUBE_PENDING=None
+    try:open_browser();save_nonstop()
+    except Exception:
+        STANDBY=True;MANUAL_PAUSE=old_pause
+        raise
 
 
 def run_command(payload):
@@ -596,8 +621,13 @@ def run_command(payload):
     if action=='status':return status()
     if action=='catalog_status':return CATALOG.status()
     if action=='catalog_search':
-        if STANDBY:raise ValueError('Bật Media trước khi tìm kiếm trên Pi')
-        return CATALOG.start(payload.get('provider'),payload.get('query'))
+        from media_catalog import query
+        query(payload.get('provider'),payload.get('query'),payload.get('kind'))
+        search_browser()
+        return CATALOG.start(payload.get('provider'),payload.get('query'),payload.get('kind'))
+    if action=='play':
+        provider,value=link_destination(payload.get('url'))
+        return play_destination(provider,value)
     if action in ('catalog_play','shortcut_play'):
         item=SHORTCUTS.get(payload.get('id')) if action=='shortcut_play' else payload
         return play_destination(item.get('provider'),item.get('url'))
@@ -647,7 +677,8 @@ def dispatch(d):
         QUALITY_AT=0
         return status()
     if action=='shortcut_save':
-        SHORTCUTS.add(d.get('provider'),d.get('url'),d.get('label'));return status()
+        source,value=link_destination(d.get('url'))
+        SHORTCUTS.add(source,value,d.get('label'));return status()
     if action=='shortcut_remove':
         SHORTCUTS.remove(d.get('id'));return status()
     if action=='shortcut_play':

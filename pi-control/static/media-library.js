@@ -3,6 +3,8 @@
  let timer,reading=false,revision=0,running=false,seen='';
  const visible=()=>!document.hidden&&$('media').classList.contains('active');
  const note=text=>$('catalog-note').textContent=text;
+ function source(){const spotify=$('catalog-provider').value==='spotify';$('catalog-kind').hidden=!spotify;$('catalog-form').dataset.provider=spotify?'spotify':'youtube'}
+ $('catalog-provider').onchange=source;source();
  async function api(payload){const r=await fetch('/api/media',{method:'POST',cache:'no-store',signal:AbortSignal.timeout(14000),headers:{'Content-Type':'application/json','X-CSRF-Token':$('ops-csrf').value},body:JSON.stringify(payload)});if(r.redirected)throw Error('Cần đăng nhập lại');const d=await r.json();if(!r.ok||!d.ok)throw Error(d.error||'Tìm kiếm chưa sẵn sàng');return d.data}
  function render(data){
   running=!!data.running;$('catalog-submit').disabled=running;note(data.message||'');
@@ -15,8 +17,8 @@
    buttons.append(play,pin);li.append(body,buttons);$('catalog-results').append(li);
   }
  }
- async function refresh(){if(!visible()||!running||reading)return;reading=true;const version=revision;try{const data=await api({action:'catalog_status'});if(version===revision)render(data)}catch(e){note(e.message);running=false}finally{reading=false;schedule(false)}}
+ async function refresh(){if(!visible()||!running||reading)return;reading=true;const version=revision;try{const data=await api({action:'catalog_status'});if(version===revision)render(data)}catch(e){note(e.message+' · Có thể bấm Tìm nhạc để thử lại.');running=false;$('catalog-submit').disabled=false}finally{reading=false;schedule(false)}}
  function schedule(immediate=true){clearTimeout(timer);if(visible()&&running){if(immediate)refresh();else timer=setTimeout(refresh,1000)}}
- $('catalog-form').onsubmit=async e=>{e.preventDefault();if(running)return;const version=++revision;running=true;$('catalog-submit').disabled=true;note('Đang tìm trên Pi…');try{const d=await api({action:'catalog_search',provider:$('catalog-provider').value,query:$('catalog-query').value});if(version===revision){render(d);schedule(false)}}catch(error){running=false;$('catalog-submit').disabled=false;note(error.message)}};
+ $('catalog-form').onsubmit=async e=>{e.preventDefault();if(running)return;const version=++revision;running=true;$('catalog-submit').disabled=true;note('Đang tìm trên Pi…');try{const d=await api({action:'catalog_search',provider:$('catalog-provider').value,query:$('catalog-query').value,kind:$('catalog-provider').value==='spotify'?$('catalog-kind').value:'videos'});if(version===revision){render(d);schedule(false)}}catch(error){running=false;$('catalog-submit').disabled=false;note(error.message)}};
  window.addEventListener('pi:view',()=>schedule());document.addEventListener('visibilitychange',()=>schedule());window.addEventListener('pagehide',()=>clearTimeout(timer));
 })();

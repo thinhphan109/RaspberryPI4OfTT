@@ -14,30 +14,48 @@ PORT = 18769
 HTTP = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
 SPOTIFY_JS = r"""(()=>{const main=document.querySelector('main');if(!main)return {};
+const parts=location.pathname.split('/'),query=decodeURIComponent(parts[2]||''),kind=parts[3]||'all';
+const visible=e=>!!e&&e.getClientRects().length>0;
+const loading=[...main.querySelectorAll('[data-testid="loading-page"],[data-testid="loadingIcon"]')].some(visible);
+const scope=kind==='tracks'?main.querySelector('[data-testid="track-list"]'):main;
 const login=!!main.querySelector('[data-testid="login-button"]');const rows=[];
-for(const a of main.querySelectorAll('a[href]')){
+for(const a of scope?.querySelectorAll('a[href]')||[]){
+ if(a.closest('footer,nav,aside,[data-testid="footer-div"],[data-testid="carousel-scroller"]'))continue;
+ if(kind==='tracks'&&!/\/track\//.test(a.href)||kind==='playlists'&&!/\/playlist\//.test(a.href))continue;
  if(!/\/(track|album|playlist|artist|episode|show)\/[A-Za-z0-9]{22}(?:\?|$|\/)/.test(a.href)||!a.getClientRects().length)continue;
  const card=a.closest('[data-testid="tracklist-row"],[data-testid="card"],[role="row"],section li')||a.parentElement;
  const title=(a.textContent||a.getAttribute('aria-label')||card?.querySelector('img')?.alt||'').trim();
  if(title)rows.push({url:a.href,title,subtitle:(card?.innerText||'').trim().slice(0,180)});
  if(rows.length>=40)break;
-}return {rows,login};})()"""
+}return {rows,login,ready:!loading&&!!scope,query,kind};})()"""
 
-YOUTUBE_JS = r"""(()=>{const rows=[];for(const card of document.querySelectorAll('ytd-video-renderer')){
- const a=card.querySelector('a#video-title');if(a)rows.push({url:a.href,title:a.textContent.trim(),subtitle:card.querySelector('#channel-name')?.textContent?.trim()||''});
+YOUTUBE_JS = r"""(()=>{const rows=[];for(const card of document.querySelectorAll('ytd-video-renderer,yt-lockup-view-model')){
+ const a=card.querySelector('a#video-title,a.yt-lockup-metadata-view-model__title,a.ytLockupMetadataViewModelTitle');if(a)rows.push({url:a.href,title:a.textContent.trim(),subtitle:card.querySelector('#channel-name,.yt-content-metadata-view-model')?.textContent?.trim()||''});
  if(rows.length>=12)break;
-}return {rows};})()"""
+}return {rows,ready:location.pathname==='/results',query:new URL(location.href).searchParams.get('search_query')};})()"""
 
 
-def query(provider, value):
+def query(provider, value, kind=None):
     if provider not in ('spotify', 'youtube'):
         raise ValueError('Nguồn tìm kiếm không hợp lệ')
     if not isinstance(value, str) or not 1 <= len(value.strip()) <= 120 or any(ord(c) < 32 for c in value):
         raise ValueError('Nhập từ khóa từ 1 đến 120 ký tự')
     value = value.strip()
-    url = ('https://open.spotify.com/search/'+quote(value, safe='') if provider == 'spotify'
+    kind=search_kind(provider,kind)
+    url = ('https://open.spotify.com/search/'+quote(value, safe='')+('/'+kind if kind!='all' else '') if provider == 'spotify'
            else 'https://www.youtube.com/results?'+urlencode({'search_query': value}))
     return value, url
+
+
+def search_kind(provider,kind=None):
+    if kind is None:return 'tracks' if provider=='spotify' else 'videos'
+    if kind not in (('tracks','playlists','all') if provider=='spotify' else ('videos',)):
+        raise ValueError('Loại tìm kiếm không hợp lệ')
+    return kind
+
+
+def search_ready(provider,value,kind,raw):
+    return isinstance(raw,dict) and raw.get('ready') is True and raw.get('query')==value and (provider!='spotify' or raw.get('kind')==kind)
 
 
 def is_search(value):
@@ -63,7 +81,7 @@ def results(provider, raw):
         if not title or url in seen:
             continue
         seen.add(url)
-        rows.append(dict(url=url, title=title, subtitle=str(item.get('subtitle') or '')[:180], provider=provider))
+        rows.append(dict(url=url, title=title, subtitle=' '.join(str(item.get('subtitle') or '').split())[:180], provider=provider))
         if len(rows) == 12:
             break
     return rows
@@ -107,19 +125,20 @@ class Catalog:
         with self.lock:
             return deepcopy(self.state)
 
-    def start(self, provider, value):
-        value, url = query(provider, value)
+    def start(self, provider, value, kind=None):
+        kind=search_kind(provider,kind)
+        value, url = query(provider, value,kind)
         with self.lock:
             if self.state['running']:
                 raise ValueError('Đang tìm kiếm; chờ hoàn tất trước khi tìm tiếp')
-            cached = self.cache.get((provider, value))
+            cached = self.cache.get((provider, value,kind))
             self.state.update(running=not bool(cached and time.monotonic()-cached[0] < 300),
                               rows=deepcopy(cached[1]) if cached else [], message='Đang tìm trên Pi…',
-                              provider=provider, query=value, revision=self.state['revision']+1)
+                              provider=provider, query=value, kind=kind,revision=self.state['revision']+1)
             if not self.state['running']:
                 self.state['message']='Kết quả đã lưu tạm'
             else:
-                threading.Thread(target=self.worker, args=(provider, value, url), daemon=True).start()
+                threading.Thread(target=self.worker, args=(provider, value, url,kind), daemon=True).start()
             return deepcopy(self.state)
 
     def browser(self):
@@ -143,14 +162,20 @@ class Catalog:
         except (OSError, ValueError, KeyError, websocket.WebSocketException):
             pass
 
-    def worker(self, provider, value, url):
+    def worker(self, provider, value, url,kind=None):
         browser = page = None
         ident = None
         rows = []
         message = ''
         try:
+            kind=search_kind(provider,kind)
             self.recover()
-            browser = self.browser()
+            ready_until=time.monotonic()+8
+            while True:
+                try:browser = self.browser();break
+                except (OSError,ValueError,websocket.WebSocketException):
+                    if time.monotonic()>=ready_until:raise
+                    time.sleep(.2)
             ident = browser.call('Target.createTarget', {'url':'about:blank', 'background':True})['targetId']
             with self.lock:
                 self.owned.add(ident)
@@ -161,7 +186,7 @@ class Catalog:
             page.call('Network.enable')
             page.call('Network.setBlockedURLs', {'urls':['*.jpg','*.jpeg','*.png','*.webp','*.woff2']})
             page.call('Page.navigate', {'url':url})
-            deadline = time.monotonic()+22
+            deadline = time.monotonic()+35
             first_rows_at=None
             changed_at=time.monotonic()
             while time.monotonic() < deadline:
@@ -172,6 +197,8 @@ class Catalog:
                     # Keep the same bounded job and ignore late response IDs.
                     continue
                 raw = result.get('result', {}).get('value') or {}
+                if not search_ready(provider,value,kind,raw):
+                    time.sleep(.4);continue
                 found = results(provider, raw)
                 if found!=rows:changed_at=time.monotonic()
                 rows=found
@@ -182,7 +209,7 @@ class Catalog:
             message = f'{len(rows)} kết quả · phát trên loa của Pi' if rows else 'Chưa có kết quả. Kiểm tra đăng nhập, kết nối hoặc thử từ khóa khác trên Pi.'
             if rows:
                 with self.lock:
-                    self.cache[(provider,value)] = (time.monotonic(),deepcopy(rows))
+                    self.cache[(provider,value,kind)] = (time.monotonic(),deepcopy(rows))
                     while len(self.cache) > 8:
                         self.cache.pop(next(iter(self.cache)))
         except Exception:

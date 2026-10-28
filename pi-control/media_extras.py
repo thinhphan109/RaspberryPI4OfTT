@@ -46,6 +46,17 @@ def destination(provider, value):
     raise ValueError('Nguồn phát không hợp lệ')
 
 
+def link_destination(value):
+    """Infer a supported provider from the pasted link, never the current tab."""
+    if isinstance(value,str):
+        value=value.strip()
+        if value.startswith('spotify:'):return 'spotify',spotify_player.url(value)
+        try:host=urlsplit(value).hostname
+        except ValueError:host=None
+        if host=='open.spotify.com':return 'spotify',destination('spotify',value)
+    return 'youtube',destination('youtube',value)
+
+
 class Shortcuts:
     def __init__(self, path):
         self.path = Path(path)
@@ -143,12 +154,17 @@ class CommandReceipt:
             return dict(self.receipt)
         action = self.receipt['action']
         expected = self.expected
+        if action in ('play','shortcut_play') and state.get('content_unavailable'):
+            self.receipt.update(state='unconfirmed',message=state.get('notice') or 'Nội dung không khả dụng trên Spotify.')
+            return dict(self.receipt)
         ready = state.get('connected') and not state.get('login_required')
         playing = ready and state.get('has_video') and state.get('paused') is False and not state.get('launch_pending')
         confirmed = False
         if action in ('play','shortcut_play'):
             target = expected.get('url', '')
             matched = target in (state.get('context_url'), state.get('collection_url'), state.get('url'))
+            if expected.get('provider')=='spotify' and '/track/' in target:
+                matched=target==state.get('url') and state.get('track_matches') is True
             confirmed = playing and state.get('provider','youtube') == expected.get('provider') and matched
         elif action == 'toggle':
             confirmed = ready and state.get('has_video') and state.get('paused') is expected.get('paused')
