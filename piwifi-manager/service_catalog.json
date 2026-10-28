@@ -25,7 +25,7 @@
     "media": {
       "label": "YouTube và Spotify", "kind": "managed", "requires": ["audio"],
       "packages": ["python3-websocket", "chromium", "libwidevinecdm0"],
-      "files": ["media_agent.py", "media_policy.py", "spotify_player.py", "audio_client.py", "runtime_config.py"],
+      "files": ["media_agent.py", "media_policy.py", "media_extras.py", "spotify_player.py", "audio_client.py", "runtime_config.py"],
       "services": [
         {"id":"media","unit":"pi-control-media.service","legacy_unit":"pi-media.service","scope":"user","activation":"continuous","label":"Agent điều khiển Media","purpose":"Nhận lệnh phát, hẹn giờ và chính sách nghe nhạc cho cửa sổ Media riêng.","stop_impact":"Mất điều khiển và các chính sách nền; browser có thể vẫn phát nhạc.","normal_inactive":"Chỉ khi không sử dụng agent điều khiển.","dependencies":["audio"]},
         {"id":"media-browser","unit":"pi-control-media-browser.service","legacy_unit":"pi-media-browser.service","scope":"user","activation":"on-demand","label":"Trình duyệt phát nhạc","purpose":"Chromium riêng cho YouTube/Spotify; cần phiên desktop, đăng nhập tài khoản trực tiếp khi cần.","stop_impact":"Nhạc dừng và giải phóng tài nguyên browser; không tắt Audio/Bluetooth.","normal_inactive":"Bình thường khi chọn Cho Media nghỉ; không tự mở chỉ vì Dashboard truy cập.","dependencies":["desktop","pipewire.service"]}
