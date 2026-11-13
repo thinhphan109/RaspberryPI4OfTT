@@ -9,7 +9,7 @@ function harness(initial,deferFirst=false){
  const controls=['toggle','next'].map(action=>Object.assign(node('media-'+action),{dataset:{media:action}}));
  const document={hidden:false,activeElement:null,getElementById:node,createElement:t=>node(t+seq++),addEventListener:(k,f)=>(listeners[k]??=[]).push(f),querySelectorAll:s=>s==='[data-media-source]'?sources:s==='[data-media]'?controls:[]};
  node('ops-csrf').value='csrf-extras';
- const context={document,window:{addEventListener:document.addEventListener,PiUI:{feedback:(id,text,tone)=>feedback.push({text,tone})}},location:{},AbortSignal,
+ const context={CustomEvent:class{constructor(type){this.type=type}},document,window:{dispatchEvent:()=>{},addEventListener:document.addEventListener,PiUI:{feedback:(id,text,tone)=>feedback.push({text,tone})}},location:{},AbortSignal,
   setInterval:(f,ms)=>{const id=++seq;timers.set(id,{f,ms});return id},clearInterval:id=>timers.delete(id),
   fetch:async(url,options)=>{calls.push({url,options});const data=deferFirst&&calls.length===1?await deferred:payload;return {ok:true,redirected:false,json:async()=>({ok:true,data})}}};
  vm.runInNewContext(script,context);

@@ -1,5 +1,7 @@
 # SpotX trên Raspberry Pi — đối chiếu ngày 28/10/2026
 
+Khảo sát mở rộng ngày 29/10/2026: [các dự án Spotify cho Dashboard](SPOTIFY_PROJECT_SURVEY_20261029.md).
+
 ## Kết luận
 
 SpotX không patch Spotify Web Player đang dùng trong Dashboard. Repo được gửi

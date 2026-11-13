@@ -18,10 +18,10 @@ python3 -c 'from PIL import Image' >/dev/null 2>&1 && command -v ffmpeg >/dev/nu
 install -d -o root -g root -m 0755 "$RELEASE_ROOT"
 [[ ! -e "$release" ]] || { echo 'Release already exists'; exit 1; }
 install -d -o root -g root -m 0755 "$release/templates" "$release/static/fonts" "$release/helper"
-install -o root -g root -m 0644 app.py read_cache.py runtime_config.py audio_agent.py audio_client.py camera_renderer.py render_jobs.py service_catalog.py service_catalog.json deployment_history.py hub.py media.py media_agent.py media_policy.py media_extras.py media_catalog.py youtube_quality.py spotify_player.py audio_control.py camera.py camera_agent.py camera_policy.py storage_writes.py system_events.py apps.json metrics.py observer.py state.py mcp_server.py hardware.py security.py "$release/"
+install -o root -g root -m 0644 app.py read_cache.py runtime_config.py audio_agent.py audio_client.py camera_renderer.py render_jobs.py service_catalog.py service_catalog.json deployment_history.py hub.py media.py media_agent.py media_policy.py media_extras.py media_catalog.py youtube_quality.py spotify_player.py native_player.py audio_control.py camera.py camera_agent.py camera_policy.py storage_writes.py system_events.py apps.json metrics.py observer.py state.py mcp_server.py hardware.py security.py "$release/"
 install -o root -g root -m 0644 templates/index.html "$release/templates/"
 install -o root -g root -m 0644 templates/camera.html templates/help.html templates/mobile.html "$release/templates/"
-install -o root -g root -m 0644 static/camera.js static/camera.css static/interface.js static/service-help.js static/mobile.js static/mobile.css "$release/static/"
+install -o root -g root -m 0644 static/camera.js static/camera.css static/interface.js static/service-help.js static/mobile.js static/mobile.css static/native-player.js "$release/static/"
 install -o root -g root -m 0644 static/dashboard.css static/studio.css static/charts.js static/dashboard.js static/hub.js static/media.js static/quick-audio.js static/media-library.js static/audio.js static/storage-writes.js static/operations.js static/hardware.js static/theme.js static/raspberry-pi.png "$release/static/"
 install -o root -g root -m 0644 static/fonts/noto-sans.woff2 static/fonts/OFL.txt "$release/static/fonts/"
 install -o root -g root -m 0644 static/fonts/jetbrains-mono.woff2 static/fonts/JetBrainsMono-OFL.txt "$release/static/fonts/"

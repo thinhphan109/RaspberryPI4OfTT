@@ -5,7 +5,7 @@ const sources=['youtube','spotify'].map(p=>Object.assign(node(p),{dataset:{media
 const ytOnly=[node('queue-panel'),node('repeat-panel')];
 const document={hidden:false,activeElement:null,getElementById:node,createElement:t=>node(t+sequence++),addEventListener:(k,v)=>(listeners[k]??=[]).push(v),querySelectorAll:s=>s==='[data-media-source]'?sources:s==='[data-youtube-only]'?ytOnly:[]};
 node('ops-csrf').value='csrf-source-test';
-const context={document,window:{addEventListener:document.addEventListener},location:{},AbortSignal,
+const context={CustomEvent:class{constructor(type){this.type=type}},document,window:{dispatchEvent:()=>{},addEventListener:document.addEventListener},location:{},AbortSignal,
 setInterval:(f,ms)=>{const id=++sequence;timers.set(id,{f,ms});return id},clearInterval:id=>timers.delete(id),
 fetch:async(path,options)=>{calls.push({path,options});if(options.method){const command=JSON.parse(options.body);if(command.action==='source')payload={provider:'spotify',connected:true,login_required:true,queue:[],spotify_ad_filter:true};}return {ok:true,redirected:false,json:async()=>({ok:true,data:payload})}}};
 vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'../static/media.js'),'utf8'),context);

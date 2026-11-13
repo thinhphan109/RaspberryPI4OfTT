@@ -45,6 +45,7 @@ jobs:
           node pi-control/tests/test_media_sources.js
           node pi-control/tests/test_media_extras.js
           node pi-control/tests/test_quick_media.js
+          node pi-control/tests/test_native_player.js
           node pi-control/tests/test_catalog_dom.js
           node pi-control/tests/test_service_help.js
           node ops/test-nonstop.js

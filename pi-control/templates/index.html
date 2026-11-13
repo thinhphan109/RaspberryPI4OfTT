@@ -221,6 +221,17 @@
                     </section><section data-youtube-only class="media-panel media-queue-panel"><h2 class="panel-title">Hàng đợi · <span id="media-count">0</span></h2><div class="ops-heading"><button class="btn btn-outline" data-media="clear">Xoá hàng đợi</button></div><ol id="media-queue"></ol>
 
                     </section></div>
+<section class="card media-native" aria-labelledby="native-title">
+ <div class="ops-heading"><div><h2 id="native-title">Ứng dụng trên Pi</h2><p class="text-xs text-muted">Điều khiển app đang mở, độc lập với Web Player.</p></div><button id="native-scan" type="button" class="btn btn-outline">Quét ứng dụng</button></div>
+ <p id="native-note" class="text-sm text-muted" role="status">Mở VLC hoặc app hỗ trợ MPRIS trên Pi rồi bấm Quét ứng dụng.</p>
+ <div id="native-player" hidden>
+  <label for="native-select">Ứng dụng</label><select id="native-select"></select>
+  <div class="native-track"><strong id="native-track-title"></strong><span id="native-track-artist" class="text-muted"></span><span id="native-state" class="badge"></span></div>
+  <div class="native-controls"><button type="button" class="btn btn-outline" data-native="previous">Bài trước</button><button type="button" class="btn btn-primary" data-native="play">Phát</button><button type="button" class="btn btn-outline" data-native="pause">Tạm dừng</button><button type="button" class="btn btn-outline" data-native="next">Bài tiếp</button><button type="button" class="btn btn-outline" data-native="seek" data-value="-10">−10 giây</button><button type="button" class="btn btn-outline" data-native="seek" data-value="10">+10 giây</button></div>
+  <label for="native-volume">Âm lượng ứng dụng <span id="native-volume-value">—</span></label><input id="native-volume" type="range" min="0" max="100" value="0" disabled>
+  <p class="text-xs text-muted">Hẹn giờ ngủ, Nonstop và bảo vệ Bluetooth phía trên dành cho Web Player. Nút Loa chỉnh đầu ra hệ thống.</p>
+ </div>
+</section>
 </section>
         <section id="audio" class="view-section">
             <div class="page-header"><div><h1 class="page-title">Âm thanh</h1><p class="text-muted">Chọn thiết bị và điều chỉnh âm lượng.</p></div><button id="audio-refresh" type="button" class="btn btn-outline">Làm mới</button>{{assist('audio')}}</div>
@@ -760,6 +771,7 @@
 <script src="{{url_for('static',filename='operations.js',v=asset_version)}}" defer></script>
 <script src="{{url_for('static',filename='storage-writes.js',v=asset_version)}}" defer></script>
 <script src="{{url_for('static',filename='mobile.js',v=asset_version)}}" defer></script>
+<script src="{{url_for('static',filename='native-player.js',v=asset_version)}}" defer></script>
 {% endif %}
 
 </body>

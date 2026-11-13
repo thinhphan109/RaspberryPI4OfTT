@@ -20,6 +20,7 @@ if not modular():import audio_control
 import spotify_player as spotify
 from media_catalog import Catalog, is_search
 import youtube_quality
+from native_player import NativePlayer
 
 PORT=18769
 HTTP=urllib.request.build_opener(urllib.request.ProxyHandler({}))
@@ -57,6 +58,7 @@ SPOTIFY_PENDING=0
 SHORTCUTS=Shortcuts(CONFIG.with_name('shortcuts.json'))
 RECEIPT=CommandReceipt()
 BT_GUARD=BluetoothGuard()
+NATIVE=NativePlayer()
 GUARD_SCRIPT=None
 GUARD_TARGET=''
 GUARD_FILE=desktop_runtime()/'pi-media-bluetooth-hold.json'
@@ -618,6 +620,7 @@ def search_browser():
 def run_command(payload):
     """Track observed results without blocking an HTTP request waiting for playback."""
     action=payload.get('action','status')
+    if action in ('apps','app_status','app_command'):return native_dispatch(payload)
     if action=='status':return status()
     if action=='catalog_status':return CATALOG.status()
     if action=='catalog_search':
@@ -903,6 +906,14 @@ def advance_loop():
                     move_next(s)
             except Exception:ERROR=('Nonstop đang chờ thử lại; nếu có hộp thoại đăng nhập/keyring, xử lý trên Pi.' if NONSTOP else 'Chưa chuyển được bài tiếp theo; dùng nút Bài tiếp hoặc kiểm tra desktop.')
 
+def native_dispatch(payload):
+    action=payload.get('action')
+    if action=='apps':return NATIVE.players()
+    if action=='app_status':return NATIVE.status(payload.get('id'),payload.get('owner'))
+    if action=='app_command':return NATIVE.command(payload.get('id'),payload.get('owner'),payload.get('command'),payload.get('value'))
+    raise ValueError('Thao tác ứng dụng không hợp lệ.')
+
+
 class Handler(socketserver.StreamRequestHandler):
     def handle(self):
         self.connection.settimeout(12)
@@ -911,7 +922,10 @@ class Handler(socketserver.StreamRequestHandler):
             if len(raw)>4096:raise ValueError('Yêu cầu quá dài')
             data=json.loads(raw)
             if not isinstance(data,dict):raise ValueError('Yêu cầu không hợp lệ')
-            with LOCK:result=run_command(data)
+            if data.get('action') in ('apps','app_status','app_command'):
+                result=native_dispatch(data)  # Own lock; D-Bus never holds the browser policy lock.
+            else:
+                with LOCK:result=run_command(data)
             response={'ok':True,'data':result}
         except Exception as exc:response={'ok':False,'error':str(exc)[:200]}
         self.wfile.write(json.dumps(response).encode()+b'\n')
