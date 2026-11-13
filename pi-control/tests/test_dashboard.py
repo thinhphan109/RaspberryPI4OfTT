@@ -14,14 +14,6 @@ def load(name,path):
     loader.exec_module(module)
     return module
 
-def guard_module():
-    original=importlib.machinery.SourceFileLoader.exec_module
-    def redirected(loader,module):
-        if loader.name=='piwifi_helper': module.__dict__.update(vars(load('test_guard_helper',ROOT/'helper/piwifi-helper')))
-        else: original(loader,module)
-    with patch.object(importlib.machinery.SourceFileLoader,'exec_module',redirected):
-        return load('test_guard',ROOT/'helper/piwifi-guard')
-
 class DashboardTests(unittest.TestCase):
     def setUp(self):
         app._read_cache.clear()
@@ -89,40 +81,7 @@ class DashboardTests(unittest.TestCase):
             info=h.hotspot_info();self.assertEqual(info['password_mask'],'••••••••')
             self.assertNotIn('password',info)
             self.assertNotIn('802-11-wireless-security.psk',nm.call_args.args)
-    def test_active_client_wifi_is_preserved(self):
-        g=guard_module()
-        with patch.object(g.helper,'get_active',return_value='home'),patch.object(g.helper,'connect_profile') as connect:
-            self.assertEqual(g.run()['state'],'preserved');connect.assert_not_called()
-    def test_hotspot_client_and_unknown_preserved(self):
-        g=guard_module()
-        for count,expected in ((2,'hotspot-in-use'),(None,'clients-unknown')):
-            with patch.object(g.helper,'get_active',return_value='Pi-Fallback'),patch.object(g.helper,'nm',return_value='enabled'),patch.object(g,'clients',return_value=count),patch.object(g.helper,'connect_profile') as connect:
-                self.assertEqual(g.run()['state'],expected);connect.assert_not_called()
-    def test_failed_ap_scan_preserves_hotspot(self):
-        g=guard_module()
-        with patch.object(g.helper,'get_active',return_value='Pi-Fallback'),patch.object(g.helper,'nm',return_value='enabled'),patch.object(g,'clients',return_value=0),patch.object(g,'previous_state',return_value={'empty_checks':1}),patch.object(Path,'read_text',return_value='0'),patch.object(g.helper,'command',side_effect=RuntimeError('unsupported')),patch.object(g.helper,'connect_profile') as connect:
-            self.assertEqual(g.run()['state'],'ap-scan-unavailable');connect.assert_not_called()
-    def test_empty_ap_wait_and_return(self):
-        g=guard_module()
-        with patch.object(g.helper,'get_active',return_value='Pi-Fallback'),patch.object(g.helper,'nm',return_value='enabled'),patch.object(g,'clients',return_value=0),patch.object(g,'previous_state',return_value={}),patch.object(Path,'read_text',return_value='0'),patch.object(g.helper,'connect_profile') as connect:
-            self.assertEqual(g.run()['state'],'waiting-no-clients');connect.assert_not_called()
-        with patch.object(g.helper,'get_active',return_value='Pi-Fallback'),patch.object(g.helper,'nm',return_value='enabled'),patch.object(g,'clients',return_value=0),patch.object(g,'previous_state',return_value={}),patch.object(Path,'read_text',return_value='9999999999'),patch.object(g.helper,'connect_profile') as connect:
-            self.assertEqual(g.run()['state'],'hotspot-grace');connect.assert_not_called()
-        with patch.object(g.helper,'get_active',return_value='Pi-Fallback'),patch.object(g.helper,'nm',return_value='enabled'),patch.object(g,'clients',return_value=0),patch.object(g,'previous_state',return_value={'empty_checks':1}),patch.object(Path,'read_text',return_value='0'),patch.object(g.helper,'command',return_value='\tSSID: Home'),patch.object(g,'candidates',return_value=[('home','uuid')]),patch.object(g.helper,'connect_profile') as connect:
-            self.assertEqual(g.run()['state'],'returned-to-wifi');connect.assert_called_once_with('uuid')
-    def test_client_arrives_before_return(self):
-        g=guard_module()
-        with patch.object(g.helper,'get_active',return_value='Pi-Fallback'),patch.object(g.helper,'nm',return_value='enabled'),patch.object(g,'clients',side_effect=[0,1]),patch.object(g,'previous_state',return_value={'empty_checks':1}),patch.object(Path,'read_text',return_value='0'),patch.object(g.helper,'command',return_value='SSID: Home'),patch.object(g,'candidates',return_value=[('home','uuid')]),patch.object(g.helper,'connect_profile') as connect:
-            self.assertEqual(g.run()['state'],'client-arrived');connect.assert_not_called()
-    def test_failed_return_restores_ap(self):
-        g=guard_module()
-        with patch.object(g.helper,'get_active',return_value='Pi-Fallback'),patch.object(g.helper,'nm',return_value='enabled'),patch.object(g,'clients',return_value=0),patch.object(g,'previous_state',return_value={'empty_checks':1}),patch.object(Path,'read_text',return_value='0'),patch.object(g.helper,'command',return_value='SSID: Home'),patch.object(g,'candidates',return_value=[('home','uuid')]),patch.object(g.helper,'connect_profile',side_effect=[RuntimeError('wrong password'),None]) as connect:
-            self.assertEqual(g.run()['state'],'return-failed-restored-ap');self.assertEqual(connect.call_args.args,('Pi-Fallback',))
-    def test_disconnected_fallback_and_disabled_radio(self):
-        g=guard_module()
-        with patch.object(g.helper,'get_active',return_value='--'),patch.object(g.helper,'nm',side_effect=lambda *a:'enabled' if a==('radio','wifi') else '30 (disconnected)'),patch.object(g,'candidates',return_value=[('first','u1'),('second','u2')]),patch.object(g.helper,'connect_profile',side_effect=[RuntimeError(),RuntimeError(),None]) as connect:
-            self.assertEqual(g.run()['state'],'fallback');self.assertEqual(connect.call_args.args,('Pi-Fallback',))
-        with patch.object(g.helper,'get_active',return_value='--'),patch.object(g.helper,'nm',return_value='disabled'),patch.object(g.helper,'connect_profile') as connect:
-            self.assertEqual(g.run()['state'],'radio-disabled');connect.assert_not_called()
+    # Wi-Fi guard policy coverage lives in test_fallback_logic.py; it runs
+    # independently of Flask and Linux-only helper imports.
 
 if __name__=='__main__':unittest.main()

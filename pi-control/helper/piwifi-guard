@@ -4,6 +4,7 @@ import importlib.util
 import importlib.machinery
 import ipaddress
 import json
+import math
 import time
 from pathlib import Path
 
@@ -11,6 +12,8 @@ loader = importlib.machinery.SourceFileLoader('piwifi_helper','/usr/local/sbin/p
 helper = importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name,loader))
 loader.exec_module(helper)
 STATE = Path('/run/piwifi-guard.json')
+CONNECT_GRACE = 90
+MAX_ATTEMPTS = 2
 
 def previous_state():
     try: return json.loads(STATE.read_text())
@@ -45,12 +48,51 @@ def candidates(visible=None):
         except Exception: continue
     return result
 
+def connection_status():
+    """A profile name also exists while activating; require completed IPv4."""
+    values = helper.nm('-g','GENERAL.STATE,GENERAL.CONNECTION,IP4.ADDRESS',
+                       'device','show',helper.IFACE).splitlines()
+    try: code = int(values[0].split()[0])
+    except (IndexError, ValueError): raise RuntimeError('Không đọc được trạng thái Wi-Fi')
+    profile = values[1].strip() if len(values) > 1 else ''
+    addresses = []
+    for value in values[2:]:
+        try: address = ipaddress.ip_interface(value.strip()).ip
+        except ValueError: continue
+        if address.version == 4 and not (address.is_unspecified or address.is_loopback
+                                         or address.is_link_local or address.is_multicast):
+            addresses.append(str(address))
+    return dict(device_state=code, profile=profile, ipv4=addresses,
+                ready=code == 100 and profile not in ('','--') and bool(addresses))
+
+def offline_since(old, now):
+    try: since = float(old['offline_since'])
+    except (KeyError, TypeError, ValueError): return now
+    return since if math.isfinite(since) and 0 <= since <= now else now
+
+def start_fallback(since, reason):
+    # NetworkManager may complete a connection between two observations.
+    current = connection_status()
+    if current['ready'] and current['profile'] != helper.FALLBACK:
+        return dict(state='preserved', profile=current['profile'], empty_checks=0)
+    try:
+        # Explicit activation replaces a stuck authentication/DHCP attempt.
+        helper.connect_profile(helper.FALLBACK,recovery=False)
+        current = connection_status()
+        if not current['ready'] or current['profile'] != helper.FALLBACK:
+            raise RuntimeError('Hotspot chưa có kết nối và IPv4 hoàn chỉnh')
+    except Exception as exc:
+        return dict(state='error',error=str(exc)[:240],offline_since=since,
+                    reason=reason,device_state=current['device_state'])
+    return dict(state='fallback',empty_checks=0,reason=reason)
+
 def run():
-    active=helper.get_active()
-    if active and active not in ('--',helper.FALLBACK):
+    current=connection_status()
+    active=current['profile']
+    if current['ready'] and active != helper.FALLBACK:
         return {'state':'preserved','profile':active,'empty_checks':0}
     if helper.nm('radio','wifi') != 'enabled': return {'state':'radio-disabled'}
-    if active == helper.FALLBACK:
+    if current['ready'] and active == helper.FALLBACK:
         count=clients()
         if count is None: return {'state':'clients-unknown','clients':None,'empty_checks':0}
         if count: return {'state':'hotspot-in-use','clients':count,'empty_checks':0}
@@ -73,23 +115,38 @@ def run():
         name,uuid=choices[0]
         try:
             helper.connect_profile(uuid)
+            current=connection_status()
+            if not current['ready'] or current['profile'] != name:
+                raise RuntimeError('Wi-Fi chưa có kết nối và IPv4 hoàn chỉnh')
             return {'state':'returned-to-wifi','profile':name,'empty_checks':0}
         except Exception:
-            helper.connect_profile(helper.FALLBACK,recovery=False)
+            restored=start_fallback(time.monotonic(),'return-failed')
+            if restored['state'] != 'fallback': return restored
             return {'state':'return-failed-restored-ap','empty_checks':0,'retry_after':now+120}
-    state=helper.nm('-g','GENERAL.STATE','device','show',helper.IFACE)
-    if not state.startswith('30 '): return {'state':'device-busy-or-unavailable'}
-    deadline=time.monotonic()+120
-    for name,uuid in candidates():
-        if time.monotonic()>=deadline: break
-        if helper.get_active() not in ('','--'): return {'state':'preserved','profile':helper.get_active()}
+    now=time.monotonic()
+    since=offline_since(previous_state(),now)
+    code=current['device_state']
+    if code in (0,10,20):
+        return dict(state='device-busy-or-unavailable',device_state=code,offline_since=since)
+    if now-since >= CONNECT_GRACE or code == 120:
+        return start_fallback(since,'connection-timeout' if code != 120 else 'connection-failed')
+    if code != 30:
+        return dict(state='connection-pending',profile=active,device_state=code,
+                    offline_since=since,remaining=math.ceil(CONNECT_GRACE-(now-since)))
+    try: choices=candidates()
+    except Exception: return start_fallback(since,'profiles-unavailable')
+    for name,uuid in choices[:MAX_ATTEMPTS]:
+        if time.monotonic()-since >= CONNECT_GRACE: break
+        current=connection_status()
+        if current['ready']:
+            return {'state':'preserved','profile':current['profile'],'empty_checks':0}
         try:
             helper.connect_profile(uuid,recovery=False)
-            return {'state':'connected','profile':name}
+            current=connection_status()
+            if current['ready']:
+                return {'state':'connected','profile':current['profile'],'empty_checks':0}
         except Exception: continue
-    if helper.get_active() not in ('','--'): return {'state':'preserved','profile':helper.get_active()}
-    helper.connect_profile(helper.FALLBACK,recovery=False)
-    return {'state':'fallback','empty_checks':0}
+    return start_fallback(since,'known-wifi-unavailable')
 
 if __name__=='__main__':
     try:
@@ -110,6 +167,7 @@ if __name__=='__main__':
                           'hotspot-grace':'Đang chờ trước khi tự về Wi-Fi', 'client-arrived':'Client vừa kết nối; giữ hotspot',
                           'ap-scan-unavailable':'Chưa quét được Wi-Fi trong chế độ hotspot',
                           'radio-disabled':'Wi-Fi đang tắt', 'device-busy-or-unavailable':'Thiết bị Wi-Fi đang bận',
+                          'connection-pending':'Đang chờ Wi-Fi hoàn tất; sẽ bật hotspot nếu quá hạn',
                           'hold-unknown':'Chưa xác định được thời gian giữ hotspot'}
                 helper.store.event('fallback', labels.get(result['state'], result['state']) +
                                    (' · ' + result['profile'] if result.get('profile') else ''),
@@ -118,5 +176,6 @@ if __name__=='__main__':
             temporary.write_text(json.dumps(result))
             temporary.replace(STATE)
             print(json.dumps(result))
+            if result['state'] == 'error': raise SystemExit(1)
     except RuntimeError as exc:
         print(json.dumps({'state':'busy-or-error','error':str(exc)}))

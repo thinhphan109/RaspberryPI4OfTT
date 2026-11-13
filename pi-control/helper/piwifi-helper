@@ -1,6 +1,7 @@
 #!/usr/bin/env -S python3 -B
 
 import sys
+import os
 import json
 import subprocess
 import time
@@ -131,7 +132,8 @@ def hotspot_info():
 
 
 def command(args):
-    p = subprocess.run(args, text=True, capture_output=True, timeout=30)
+    p = subprocess.run(args, text=True, capture_output=True, timeout=30,
+                       env={**os.environ, 'LC_ALL':'C'})
     if p.returncode != 0:
         raise RuntimeError(p.stderr.strip() or p.stdout.strip() or "Command failed")
     return p.stdout.strip()
