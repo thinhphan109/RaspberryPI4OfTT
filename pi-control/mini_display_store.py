@@ -82,6 +82,8 @@ def status():
         'ready': bool(display),
         'frame': display.get('frame'),
         'active': display.get('active'),
+        'scene': display.get('scene'),
+        'connection': display.get('connection'),
         'busy': bool(pending),
         'clip': receipt.get('clip') if (STORE / 'clip.mp4').is_file() else None,
         'error': receipt.get('error'),

@@ -9,12 +9,14 @@
                 <canvas id="mini-screen" width="320" height="240" role="img" aria-label="Bản xem trước màn hình mini"></canvas>
                 <video id="mini-clip" width="320" height="240" muted loop playsinline controls aria-label="Video trên màn hình mini" hidden></video>
                 <div id="mini-ambient" class="mini-ambient" aria-hidden="true" hidden></div>
+                <div id="mini-mascot" class="mini-mascot" aria-hidden="true" hidden><img src="{{ url_for('static', filename='mini-cat/healthy.png', v=asset_version) }}" alt=""></div>
             </div>
             <div class="mini-preview-meta"><span>320 × 240</span><span id="mini-source">Xem trước</span></div>
             <div class="mini-situation">
                 <label for="mini-mode">Tình huống xem trước</label>
                 <select id="mini-mode">
                     <option value="live">Dữ liệu từ Pi</option>
+                    <option value="network-demo">Thử mất mạng và kết nối lại</option>
                     <option value="pending">Đang chờ Wi-Fi</option>
                     <option value="hotspot">Hotspot đã bật</option>
                     <option value="playing">Đang phát nhạc</option>
@@ -54,7 +56,7 @@
             <div class="mini-options">
                 <label for="mini-default">Trang mặc định</label>
                 <select id="mini-default"></select>
-                <label class="mini-check"><input id="mini-auto" type="checkbox"> Tự ưu tiên cứu hộ, nguồn yếu và nhạc đang phát</label>
+                <label class="mini-check"><input id="mini-auto" type="checkbox"> Tự chuyển theo sự kiện trong bản xem trước</label>
                 <label class="mini-check"><input id="mini-motion" type="checkbox"> Hiệu ứng nhẹ trên màn hình</label>
             </div>
             <div class="hub-actions mini-actions">

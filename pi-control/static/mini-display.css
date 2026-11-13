@@ -4,6 +4,15 @@
 .mini-bezel{position:relative;width:100%;padding:10px;margin:0 auto;background:#1a2028;border:1px solid #343d48;border-radius:15px}
 .mini-bezel :is(canvas,img,video){display:block;width:100%;height:auto;aspect-ratio:4/3;background:#10151d;border-radius:6px}
 .mini-bezel [hidden]{display:none}
+.mini-mascot{position:absolute;inset:11px;overflow:hidden;pointer-events:none}
+.mini-mascot img{position:absolute;aspect-ratio:1;background:transparent;transform-origin:50% 83%}
+.mini-mascot img[data-motion=nod]{animation:mini-nod 5.2s ease-in-out infinite}
+.mini-mascot img[data-motion=sway]{animation:mini-sway 1.7s ease-in-out infinite}
+.mini-mascot img[data-motion=doze]{animation:mini-doze 3.6s ease-in-out infinite}
+@keyframes mini-nod{0%,16%,100%{transform:none}8%{transform:translateY(2px) rotate(-3deg)}}
+@keyframes mini-sway{0%,100%{transform:rotate(-3deg)}50%{transform:rotate(3deg)}}
+@keyframes mini-doze{0%,100%{transform:none}50%{transform:translateY(2px) scaleY(.97)}}
+@media(prefers-reduced-motion:reduce){.mini-mascot img[data-motion]{animation:none}}
 .mini-ambient{position:absolute;inset:11px;overflow:hidden;border-radius:6px;pointer-events:none}
 .mini-ambient::before,.mini-ambient::after{content:"";position:absolute;inset:0;opacity:.4;animation:mini-glimmer 8s ease-in-out infinite alternate}
 .mini-ambient::before{

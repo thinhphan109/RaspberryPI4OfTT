@@ -6,6 +6,8 @@
     const screen = $('mini-screen');
     const ctx = screen.getContext('2d');
     const clip = $('mini-clip');
+    const mascotLayer = $('mini-mascot');
+    const mascotImage = mascotLayer.querySelector('img');
     const frame = new Image(320, 240);
     frame.alt = 'Trang Tổng quan do Pi dựng';
     frame.hidden = true;
@@ -34,7 +36,7 @@
                 auto: saved.auto !== false, motion: saved.motion !== false};
         } catch { return base; }
     }
-    let config = load(), selected = null, timer, animationTimer, pending;
+    let config = load(), selected = null, timer, pending, demoStart = 0, animatedCat;
     let metrics = JSON.parse($('initial-metrics').textContent);
     let network = JSON.parse($('initial-network').textContent);
     let media = null, audio = null, fetchedAt = 0, dataMissing = false;
@@ -75,12 +77,25 @@
         }
         return sprites.get(name);
     }
-    function cat(id, x, y, size, breathe = false) {
+    function cat(id, x, y, size, motion) {
         const sprite = image('mini-cat/' + id + '.png');
         if (!sprite.complete || !sprite.naturalWidth) return;
-        const offset = breathe && config.motion && !reduced.matches ? Math.sin(Date.now() / 500) * 2 : 0;
+        if (motion && config.motion && !reduced.matches) {
+            animatedCat = {sprite, x, y, size, motion};
+            return;
+        }
         ctx.imageSmoothingEnabled = true;
-        ctx.drawImage(sprite, x, y + offset, size, size);
+        ctx.drawImage(sprite, x, y, size, size);
+    }
+    function syncMascot() {
+        mascotLayer.hidden = !animatedCat;
+        if (!animatedCat) return;
+        const {sprite, x, y, size, motion} = animatedCat;
+        if (mascotImage.src !== sprite.src) mascotImage.src = sprite.src;
+        if (mascotImage.dataset.motion !== motion) mascotImage.dataset.motion = motion;
+        mascotImage.style.left = x / screen.width * 100 + '%';
+        mascotImage.style.top = y / screen.height * 100 + '%';
+        mascotImage.style.width = size / screen.width * 100 + '%';
     }
     function text(value, x, y, size, color = white, family = font, maxWidth = 204) {
         ctx.fillStyle = color;
@@ -135,8 +150,8 @@
         text(shortDate.format(now), 225, 25, 12, muted, mono, 79);
         divider(35);
     }
-    function side(id, breathe = false) {
-        cat(id, 211, 50, 107, breathe);
+    function side(id, motion) {
+        cat(id, 211, 50, 107, motion);
     }
     function details(items) {
         divider(197);
@@ -159,7 +174,7 @@
         if (!Number.isFinite(value)) return '—';
         return value >= 1048576 ? (value / 1048576).toFixed(1) + ' MiB/s' : (value / 1024).toFixed(1) + ' KiB/s';
     }
-    function overview() {
+    function overview(metrics, network) {
         const ip = network?.ip?.split('/')[0] || 'Chưa có IP';
         const ssid = network?.active_ssid || network?.active || 'Chưa có Wi-Fi';
         const cpu = number(metrics.cpu, '%');
@@ -194,58 +209,73 @@
         return [ip + ' · ' + ssid, 'CPU ' + cpu + ' · RAM ' + ram + ' · ' + temp,
             volume + ' còn trống ' + free, 'Nhận ' + rx + ' · Gửi ' + tx].join(' | ');
     }
+    const scenePages = {
+        pending: 'rescue', hotspot: 'rescue', offline: 'rescue', recovered: 'rescue',
+        playing: 'music', paused: 'music', sleep: 'audio', healthy: 'health', power: 'health', hot: 'health',
+        disk: 'storage', boot: 'boot', shutdown: 'boot', demoSummary: 'summary'
+    };
     function preview() {
-        const state = mode();
-        const simulated = {
-            pending: 'rescue', hotspot: 'rescue', offline: 'rescue', playing: 'music', paused: 'music',
-            sleep: 'audio', healthy: 'health', power: 'health', hot: 'health',
-            disk: 'storage', boot: 'boot', shutdown: 'boot'
-        };
-        if (simulated[state]) return simulated[state];
-        if (selected) return selected;
-        if (config.auto) {
-            if (config.enabled.includes('rescue') && (rescueStates[metrics.guard?.state] ||
-                (network && (!network.ip || network.active === 'Pi-Fallback')))) return 'rescue';
-            if (config.enabled.includes('health') && (metrics.power?.status === 'danger' || metrics.temperature >= 80)) return 'health';
-            if (config.enabled.includes('music') && media?.has_video && media.paused === false && !media.ad && !media.standby) return 'music';
+        let state = mode();
+        if (state === 'network-demo') {
+            const elapsed = performance.now() - demoStart;
+            state = elapsed < 3000 ? 'offline' : elapsed < 10000 ? 'hotspot' :
+                elapsed < 18000 ? 'recovered' : 'demoSummary';
         }
-        return config.defaultPage;
+        if (state !== 'live') return {id: scenePages[state], state};
+        if (selected) return {id: selected, state};
+        if (config.auto) {
+            let event = service?.scene;
+            if (!event) {
+                if (network?.active === 'Pi-Fallback') event = 'hotspot';
+                else if (!metrics.stale && metrics.power?.undervoltage) event = 'power';
+                else if (!metrics.stale && metrics.temperature >= 80) event = 'hot';
+                else if (network && !network.ip) event = 'offline';
+            }
+            if (event === 'offline' && !metrics.stale && metrics.guard?.state === 'connection-pending') {
+                event = 'pending';
+            }
+            if (scenePages[event] && config.enabled.includes(scenePages[event])) {
+                return {id: scenePages[event], state: event};
+            }
+            if (service?.source !== 'clip' && config.enabled.includes('music') && media?.has_video &&
+                media.paused === false && !media.ad && !media.standby) return {id: 'music', state};
+        }
+        return {id: config.defaultPage, state};
     }
     function draw() {
         if (!accessible()) return;
-        const id = preview(), state = mode();
-        const simulated = state !== 'live';
+        const {id, state} = preview();
+        const simulated = mode() !== 'live';
         const liveDisplay = !simulated && !selected && service?.ready;
-        const showClip = liveDisplay && service.active === 'clip' && service.clip;
-        const showFrame = liveDisplay && !showClip && id === 'summary' && service.frame;
-        $('mini-ambient').hidden = Boolean(showClip || !config.motion || state === 'hotspot' ||
+        const showClip = liveDisplay && state === 'live' && service.source === 'clip' && service.clip;
+        const showFrame = liveDisplay && !showClip && id === 'summary' && service.frame &&
+            (!service.scene || service.scene === 'summary');
+        $('mini-ambient').hidden = Boolean(showClip || !config.motion || reduced.matches || state === 'hotspot' ||
             (!simulated && id === 'rescue' && network?.active === 'Pi-Fallback'));
         clip.hidden = !showClip;
         frame.hidden = !showFrame;
         screen.hidden = Boolean(showClip || showFrame);
-        if ((!showClip || reduced.matches || !config.motion) && !clip.paused) clip.pause();
+        const allowClipMotion = showClip && !reduced.matches && config.motion;
+        if (!allowClipMotion) {
+            if (!clip.paused) clip.pause();
+            delete clip.dataset.started;
+        }
         if (showClip) {
             const url = '/api/mini-display/clip.mp4?v=' + encodeURIComponent(service.clip.revision);
             if (clip.getAttribute('src') !== url) clip.src = url;
-            if (clip.paused && !reduced.matches && config.motion && !clip.dataset.started) {
+            if (clip.paused && allowClipMotion && !clip.dataset.started) {
                 clip.dataset.started = 'true';
                 clip.play().catch(() => {});
             }
             $('mini-source').textContent = 'Phát lặp';
             $('mini-reading').textContent = '';
-        } else {
-            delete clip.dataset.started;
         }
         if (showFrame) {
             const url = '/api/mini-display/frame.png?v=' + encodeURIComponent(service.frame);
             if (frame.getAttribute('src') !== url) frame.src = url;
         }
-        const animate = !screen.hidden && config.motion && !reduced.matches && id === 'clock';
-        if (animate && !animationTimer) animationTimer = setInterval(draw, 250);
-        if (!animate && animationTimer) {
-            clearInterval(animationTimer);
-            animationTimer = null;
-        }
+        animatedCat = null;
+        if (screen.hidden) syncMascot();
         if (showClip) return;
         if (showFrame) {
             $('mini-source').textContent = 'Khung từ Pi';
@@ -263,10 +293,30 @@
             (id === 'health' && (metrics.power?.status === 'danger' || metrics.temperature >= 80));
         backdrop();
         const tone = warning ? amber : accent;
-        if (id !== 'summary') header(id === 'storage' ? 'Dung lượng lưu trữ' : pages[id], tone);
+        if (id !== 'summary' && state !== 'recovered') {
+            const title = id === 'storage' ? 'Dung lượng lưu trữ' :
+                id === 'music' && (state === 'paused' || (!simulated && media?.paused)) ? 'Nhạc tạm dừng' : pages[id];
+            header(title, tone);
+        }
         let reading;
-        if (id === 'summary') {
-            reading = overview();
+        if (state === 'recovered') {
+            const connection = simulated ? {ip: '192.168.1.24', name: 'Wi-Fi chính'} : service?.connection;
+            header('Đã kết nối lại');
+            side('healthy', 'nod');
+            headline('Đã có kết nối', 16, 96, 21, 185, accent);
+            text(connection?.ip || '—', 16, 139, 17, white, mono, 186);
+            text(connection?.name || '—', 16, 167, 12, muted, font, 184);
+            divider(197);
+            text('Đang trở về trang trước', 16, 224, 14, white, font, 288);
+            reading = 'Mạng đã kết nối lại. Màn hình sẽ trở về trang trước.';
+        } else if (state === 'demoSummary') {
+            overview({temperature: 47, cpu: 18, ram: {percent: 26}, uptime: 7320,
+                disks: [{mount: '/srv/pi-control', free: 48 * 1073741824, total: 68 * 1073741824}],
+                network: [{name: 'wlan0', rx_rate: 138240, tx_rate: 12288}]},
+            {ip: '192.168.1.24', active_ssid: 'Wi-Fi chính'});
+            reading = 'Kết thúc mô phỏng phục hồi kết nối.';
+        } else if (id === 'summary') {
+            reading = overview(metrics, network);
         } else if (id === 'network') {
             const ip = network?.ip?.split('/')[0] || 'Chưa có IP';
             const ssid = network?.active_ssid || network?.active || 'Chưa đọc được Wi-Fi';
@@ -282,12 +332,14 @@
             details([['Kết nối', network?.ip ? 'Có IP' : 'Chờ IP'], ['↓ Nhận', rate(wifi?.rx_rate)], ['↑ Gửi', rate(wifi?.tx_rate)]]);
             reading = ssid + ' · ' + ip;
         } else if (id === 'rescue') {
-            const ap = state === 'hotspot' || (!simulated && network?.active === 'Pi-Fallback');
-            const ip = state === 'hotspot' ? '192.168.50.1' :
-                ['pending', 'offline'].includes(state) ? null : network?.ip?.split('/')[0];
+            const ap = state === 'hotspot' || (state === 'live' && network?.active === 'Pi-Fallback');
+            const connection = state === 'hotspot' && !simulated ? service?.connection : null;
+            const ip = state === 'hotspot' && simulated ? '192.168.50.1' :
+                ['pending', 'offline'].includes(state) ? null : connection?.ip ?? network?.ip?.split('/')[0];
             if (ap && ip) {
                 text('Wi-Fi dự phòng', 16, 63, 13, amber);
-                text(network?.hotspot?.ssid || 'RaspPI4OfTT', 16, 90, 17, white, font, 164);
+                text(connection?.name || (!simulated && network?.hotspot?.ssid) || 'RaspPI4OfTT',
+                    16, 90, 17, white, font, 164);
                 text(ip + ':18765', 16, 115, 13, white, mono, 164);
                 const qr = image('mini-fallback-qr.svg');
                 if (ip === '192.168.50.1' && qr.complete && qr.naturalWidth) {
@@ -303,7 +355,7 @@
             } else {
                 const status = state === 'offline' ? 'Mất kết nối mạng' : state === 'pending' ? rescueStates['connection-pending'] :
                     rescueStates[metrics.guard?.state] || (network?.ip ? 'Wi-Fi đang hoạt động' : 'Chưa nhận địa chỉ IP');
-                side(state === 'offline' || (!simulated && network && !ip &&
+                side(state === 'offline' || (state === 'live' && network && !ip &&
                     metrics.guard?.state !== 'connection-pending') ? 'offline' : id);
                 headline(status, 16, 96, 23, 180, tone);
                 text('Địa chỉ IP', 16, 153, 12, muted);
@@ -313,14 +365,14 @@
                 reading = status;
             }
         } else if (id === 'health') {
-            const degrees = state === 'hot' ? 84 : simulated ? 47 : metrics.temperature;
+            const degrees = simulated ? (state === 'hot' ? 84 : 47) : metrics.temperature;
             const temperature = number(degrees, '°C');
             const cpu = number(simulated ? 18 : metrics.cpu, '%');
             const ram = number(simulated ? 26 : metrics.ram?.percent, '%');
             const lowPower = state === 'power' || (!simulated && metrics.power?.undervoltage);
             const healthy = state === 'healthy' || (!simulated && metrics.power?.status === 'healthy' &&
                 !metrics.stale && Number.isFinite(degrees) && degrees < 80);
-            side(lowPower ? 'power' : healthy ? 'healthy' : id);
+            side(lowPower ? 'power' : healthy ? 'healthy' : id, healthy ? 'nod' : null);
             text('Nhiệt độ SoC', 16, 64, 13, muted);
             text(temperature, 13, 120, 48, tone, mono, 184);
             bar(Number.isFinite(degrees) ? degrees / 85 : null, 16, 132, 182, tone);
@@ -346,7 +398,8 @@
                 duration: 210, paused: state === 'paused'} : media;
             const provider = song?.provider === 'spotify' ? 'Spotify' : song?.provider === 'youtube' ? 'YouTube' : 'Media';
             const known = song?.position_known !== false && Number.isFinite(song?.position) && song?.duration > 0;
-            side(song?.title && song.paused ? 'paused' : id);
+            side(song?.title && song.paused ? 'paused' : id,
+                song?.title && song.paused === false && !song.ad && !song.standby ? 'sway' : null);
             text(provider, 16, 64, 13, accent);
             headline(song?.title || 'Chưa có bài đang phát', 16, 96, 21, 183);
             if (song?.artist) text(song.artist, 16, 151, 13, muted, font, 182);
@@ -358,7 +411,7 @@
             const output = state === 'sleep' ? {label: 'Loa', volume: 25} :
                 audio?.devices?.find(item => item.kind === 'output' && item.name === audio.defaults?.output);
             const sleep = state === 'sleep' ? {active: true, remaining: 900} : media?.preferences?.sleep;
-            side(sleep?.active ? 'sleep' : id);
+            side(sleep?.active ? 'sleep' : id, sleep?.active ? 'doze' : null);
             text('Âm lượng loa', 16, 64, 13, muted);
             text(output?.muted ? 'Tắt tiếng' : number(output?.volume, '%'), 14, 119, output?.muted ? 28 : 45, tone, mono, 184);
             bar(Number.isFinite(output?.volume) ? (output.muted ? 0 : output.volume / 100) : null, 16, 132, 182);
@@ -368,7 +421,7 @@
             reading = (output?.label || 'Chưa đọc được đầu ra') + ' · ' + note;
         } else if (id === 'clock') {
             const now = new Date();
-            side(id, true);
+            side(id, 'doze');
             text(clock.format(now), 12, 121, 50, white, mono, 187);
             text(calendar.format(now), 16, 162, 14, muted, font, 185);
             details([['Múi giờ', 'Việt Nam · UTC+7']]);
@@ -387,6 +440,7 @@
             details([['Tiến độ', '—'], ['Còn lại', '—'], ['Lớp in', '—']]);
             reading = 'Cần tích hợp dữ liệu máy in.';
         }
+        syncMascot();
         $('mini-source').textContent = simulated ? 'Mô phỏng' :
             id === 'boot' || id === 'bambu' || id === 'clock' ? 'Xem trước' :
                 metrics.stale ? 'Dữ liệu cũ' : dataMissing ? 'Thiếu dữ liệu' : 'Dữ liệu Pi';
@@ -564,7 +618,7 @@
         fetchedAt = Date.now();
         const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(12000)]);
         const wantMedia = ['music', 'audio'].includes(selected || config.defaultPage) ||
-            (!selected && config.auto && config.enabled.includes('music'));
+            (!selected && config.auto && config.enabled.includes('music') && service?.source !== 'clip');
         const wantAudio = (selected || config.defaultPage) === 'audio';
         const results = await Promise.allSettled([
             read('status', signal), wantMedia ? read('media', signal) : null, wantAudio ? read('audio', signal) : null
@@ -580,8 +634,6 @@
     }
     function schedule() {
         clearInterval(timer);
-        clearInterval(animationTimer);
-        animationTimer = null;
         pending?.abort();
         pending = null;
         fetchedAt = 0;
@@ -591,18 +643,24 @@
         if (!accessible()) {
             clip.pause();
             delete clip.dataset.started;
+            mascotLayer.hidden = true;
             return;
         }
         draw();
         refreshData();
         refreshService();
         timer = setInterval(() => {
-            if (!animationTimer && ['summary', 'clock'].includes(preview())) draw();
+            if (mode() === 'network-demo' || ['summary', 'clock'].includes(preview().id)) draw();
             refreshData();
             refreshService();
         }, 1000);
     }
-    $('mini-mode').onchange = () => { selected = null; refreshControls(); schedule(); };
+    $('mini-mode').onchange = () => {
+        selected = null;
+        demoStart = performance.now();
+        refreshControls();
+        schedule();
+    };
     $('mini-default').onchange = event => { config.defaultPage = event.target.value; selected = null; save(); refreshControls(); schedule(); };
     $('mini-auto').onchange = event => { config.auto = event.target.checked; selected = null; save(); refreshControls(); schedule(); };
     $('mini-motion').onchange = event => { config.motion = event.target.checked; save(); schedule(); };
