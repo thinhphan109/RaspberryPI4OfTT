@@ -59,6 +59,7 @@ SHORTCUTS=Shortcuts(CONFIG.with_name('shortcuts.json'))
 RECEIPT=CommandReceipt()
 BT_GUARD=BluetoothGuard()
 NATIVE=NativePlayer()
+SPOTIFY_AD_GUARD=spotify.AdStallGuard()
 GUARD_SCRIPT=None
 GUARD_TARGET=''
 GUARD_FILE=desktop_runtime()/'pi-media-bluetooth-hold.json'
@@ -377,6 +378,9 @@ def status():
     data['bluetooth_guard']=BT_GUARD.summary()
     data['command']=RECEIPT.observe(data)
     data['youtube_quality']=YOUTUBE_QUALITY
+    data['provider']=PROVIDER
+    data['youtube_nonstop']=NONSTOP
+    data['spotify_ad_recovery']=SPOTIFY_AD_GUARD.summary()
     return data
 
 
@@ -448,10 +452,18 @@ def spotify_tick():
     global SPOTIFY_PENDING,ERROR
     s=spotify_status()
     if SPOTIFY_PENDING and (time.monotonic()>SPOTIFY_PENDING or s.get('content_unavailable')):SPOTIFY_PENDING=0
-    if not s.get('connected') or s.get('login_required') or s.get('content_unavailable'):return
+    if not s.get('connected') or s.get('login_required') or s.get('content_unavailable'):
+        SPOTIFY_AD_GUARD.reset()
+        return
     ERROR=''
     volume_tick(s)
-    if sleep_tick(s):return
+    if sleep_tick(s):
+        SPOTIFY_AD_GUARD.reset()
+        return
+    if SPOTIFY_AD_GUARD.observe(s,blocked=MANUAL_PAUSE or BT_GUARD.summary().get('paused',False)):
+        SPOTIFY_PENDING=0
+        cdp('Page.reload',{'ignoreCache':False})
+        return
     if MANUAL_PAUSE:SPOTIFY_PENDING=0
     if SPOTIFY_PENDING:
         if time.monotonic()>SPOTIFY_PENDING:SPOTIFY_PENDING=0
@@ -879,8 +891,11 @@ def advance_loop():
     while True:
         time.sleep(3)
         with LOCK:
-            if STANDBY:continue
+            if STANDBY:
+                SPOTIFY_AD_GUARD.reset()
+                continue
             if BT_GUARD.latched:
+                SPOTIFY_AD_GUARD.reset()
                 try:hold_bluetooth()
                 except Exception:pass
                 continue
@@ -888,6 +903,7 @@ def advance_loop():
                 try:resume_tick();spotify_tick()
                 except Exception:ERROR='Chưa điều khiển được Spotify; kiểm tra Web Player trên Pi.'
                 continue
+            SPOTIFY_AD_GUARD.reset()
             if time.monotonic()-QUALITY_AT>=30:
                 try:evaluate(youtube_quality.script(YOUTUBE_QUALITY));QUALITY_AT=time.monotonic()
                 except Exception:pass

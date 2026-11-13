@@ -13,6 +13,7 @@ const flush=()=>new Promise(r=>setImmediate(r));
 (async()=>{
  await flush();assert.equal(timers.size,1);
  await sources[1].onclick();assert.equal(sources[1]['aria-pressed'],'true');assert(ytOnly.every(n=>n.hidden));
+ assert.equal(node('media-nonstop').disabled,true);assert.equal(node('media-nonstop').hidden,false);assert.match(node('media-nonstop').textContent,/YouTube/);
  assert.equal(node('media-toggle').disabled,true);assert.equal(node('media-spotify-account').hidden,false);
  const command=JSON.parse(calls.at(-1).options.body);assert.equal(command.provider,'spotify');assert.equal(calls.at(-1).options.headers['X-CSRF-Token'],'csrf-source-test');
  await node('media-spotify-login').onclick();assert.deepEqual(JSON.parse(calls.at(-1).options.body),{action:'spotify_login'});

@@ -12,6 +12,43 @@ HTTP=urllib.request.build_opener(urllib.request.ProxyHandler({}))
 TRACK_METADATA={}
 
 
+class AdStallGuard:
+    """Recover only explicit, unpaused ads with no progress; bounded RAM history."""
+    def __init__(self):
+        self.attempts=[]
+        self.reset()
+
+    def reset(self):
+        self.progress=None
+        self.since=None
+        self.message=''
+
+    def observe(self,state,blocked=False,now=None):
+        now=time.monotonic() if now is None else now
+        self.attempts=[at for at in self.attempts if 0<=now-at<3600]
+        if blocked or not isinstance(state,dict) or state.get('connected') is not True or state.get('ad') is not True or state.get('paused') is not False or state.get('login_required'):
+            self.reset()
+            return False
+        if not state.get('position_known') or type(state.get('position')) not in (int,float) or not math.isfinite(state['position']):
+            self.reset()
+            return False
+        progress=(state.get('title',''),state.get('duration'),int(state['position']))
+        if progress!=self.progress or self.since is None:
+            self.progress=progress;self.since=now
+            return False
+        if now-self.since<105:return False
+        if len(self.attempts)>=2 or self.attempts and now-self.attempts[-1]<600:
+            self.message='Quảng cáo chưa tiến triển. Đã giới hạn tự phục hồi; thử đổi nguồn rồi mở lại Spotify.'
+            return False
+        # Reserve the attempt before reloading, including failures. Never loop on a failing reload.
+        self.attempts.append(now);self.since=now
+        self.message='Quảng cáo đứng hơn 105 giây; đang tải lại riêng Spotify.'
+        return True
+
+    def summary(self):
+        return dict(attempts=len(self.attempts),message=self.message)
+
+
 def url(value):
     if not isinstance(value,str) or len(value)>2048:raise ValueError('Link Spotify không hợp lệ')
     if re.fullmatch(r'spotify:(?:track|album|playlist|artist|episode|show):[A-Za-z0-9]{22}',value):

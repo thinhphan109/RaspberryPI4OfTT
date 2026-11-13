@@ -15,6 +15,8 @@ Sửa tìm kiếm/link Spotify và YouTube (trạng thái deploy ghi trong tài 
 [Media r7](../pi-control/docs/MEDIA_R7.md).
 Điều khiển ứng dụng VLC/MPRIS và thử SpotiAds riêng:
 [Media r8](../pi-control/docs/MEDIA_R8.md).
+Nonstop YouTube và bảo vệ Spotify khi quảng cáo đứng:
+[Media r9](../pi-control/docs/MEDIA_R9.md).
 Giao diện điện thoại, thanh điều hướng và bố cục cảm ứng:
 [Mobile r1](../pi-control/docs/MOBILE_R1.md).
 Đối chiếu nền tảng và các hướng dùng [SpotX](../pi-control/docs/SPOTIFY_SPOTX_RESEARCH.md).
