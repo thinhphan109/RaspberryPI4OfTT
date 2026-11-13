@@ -51,6 +51,7 @@ POLICY_RETRY_AT=0
 STANDBY=False
 WAKE_URL=''
 WAKE_UNTIL=0
+WAKE_ERROR=''
 PROVIDER='youtube'
 SPOTIFY_URL=spotify.HOME
 SPOTIFY_AD_FILTER=True
@@ -174,7 +175,7 @@ def cdp(method,params=None):
                 return r.get('result',{})
     except websocket.WebSocketTimeoutException:
         WS.close();WS=None
-        raise ValueError('Chromium đang chờ trang/hộp thoại; kiểm tra desktop Pi (keyring hoặc đăng nhập).')
+        raise ValueError('Chromium chưa phản hồi. Kiểm tra cửa sổ Media trên Pi.')
     except Exception:
         WS.close();WS=None
         raise
@@ -190,8 +191,9 @@ def open_browser():
 
 def set_power(enabled):
     """Only the dedicated browser; networking, DNS and desktop stay available."""
-    global STANDBY,LAST_URL,VOLUME,WS,WS_TARGET,VOLUME_SCRIPT,HOOK_VOLUME,RECOVERY_AT,RECOVERY_COUNT,WAKE_URL,WAKE_UNTIL,SPOTIFY_URL
+    global STANDBY,LAST_URL,VOLUME,WS,WS_TARGET,VOLUME_SCRIPT,HOOK_VOLUME,RECOVERY_AT,RECOVERY_COUNT,WAKE_URL,WAKE_UNTIL,SPOTIFY_URL,WAKE_ERROR
     if type(enabled) is not bool:raise ValueError('Trạng thái Media cần giá trị bật/tắt')
+    WAKE_ERROR=''
     if enabled:
         previous=STANDBY;STANDBY=False
         try:cold=not bool(pages())
@@ -228,10 +230,14 @@ def set_power(enabled):
 
 def resume_tick():
     """Navigate explicitly after cold start; homepage previews are not playback."""
-    global WAKE_URL,SPOTIFY_PENDING
+    global WAKE_URL,WAKE_ERROR
     if not WAKE_URL:return
-    if STANDBY or time.monotonic()>WAKE_UNTIL:
+    if STANDBY:
         WAKE_URL='';return
+    if time.monotonic()>WAKE_UNTIL:
+        WAKE_URL=''
+        WAKE_ERROR='Hết thời gian mở Media. Bấm Phát để thử lại hoặc kiểm tra cửa sổ trên Pi.'
+        return
     if PROVIDER=='spotify':
         if WAKE_URL==spotify.HOME:
             install_volume_hook(limited_volume(VOLUME));cdp('Page.navigate',{'url':spotify.HOME})
@@ -268,6 +274,7 @@ return {title:(document.querySelector('h1.ytd-watch-metadata')?.textContent||doc
 up_next:{url:href,title:(a?.getAttribute('title')||a?.textContent||next?.getAttribute('data-tooltip-text')||'Bài YouTube đề xuất').trim().slice(0,300)},
 recommendations:[...document.querySelectorAll('ytd-compact-video-renderer a#video-title,yt-lockup-view-model a.ytLockupMetadataViewModelTitle')].slice(0,40).map(a=>({url:a.href,title:(a.getAttribute('title')||a.textContent||'Video đề xuất').trim().slice(0,300)})),
 url:location.href,has_video:!!v,paused:v?v.paused:true,ended:v?v.ended:false,
+position_known:!!v&&Number.isFinite(v.currentTime),buffering:!!v&&!v.paused&&v.readyState<3,
 position:v?n(v.currentTime):0,duration:v?n(v.duration):0,volume:v?Math.round(v.volume*100):0,video_height:v?v.videoHeight:0,
 muted:v?v.muted:false,ad:!!document.querySelector('.ad-showing'),
 autoplay:document.querySelector('.ytp-autonav-toggle-button')?.getAttribute('aria-checked')==='true',
@@ -328,7 +335,7 @@ def player_status():
     try:
         d=evaluate(STATE_JS);d['connected']=True
         if not d.get('title') and not d.get('has_video'):
-            d['notice']='Trang chưa tải. Kiểm tra hộp thoại keyring trên desktop Pi rồi thử lại.'
+            d['notice']='Trang YouTube chưa tải xong. Nếu vẫn đứng, kiểm tra cửa sổ Media trên Pi.'
         # Export only the dedicated player's YouTube video, never arbitrary URLs.
         try:d['context_url']=youtube_destination(d['url'])
         except ValueError:d['context_url']=''
@@ -344,7 +351,7 @@ def player_status():
         d.update(preferences=POLICY.summary(),policy_note=POLICY_NOTE)
         return d
     except Exception:
-        return dict(connected=False,title='Chưa kết nối cửa sổ Media',queue=list(QUEUE),error=ERROR,nonstop=NONSTOP,manual_pause=MANUAL_PAUSE,nonstop_note=NONSTOP_NOTE,volume_schedule=volume_policy(),up_next=None,preferences=POLICY.summary(),policy_note=POLICY_NOTE)
+        return dict(standby=False,connected=False,title='Chưa kết nối cửa sổ Media',queue=list(QUEUE),error=ERROR,nonstop=NONSTOP,manual_pause=MANUAL_PAUSE,nonstop_note=NONSTOP_NOTE,volume_schedule=volume_policy(),up_next=None,preferences=POLICY.summary(),policy_note=POLICY_NOTE)
 
 
 def spotify_status():
@@ -370,13 +377,21 @@ def status():
     if WAKE_URL:
         data=dict(provider=PROVIDER,standby=STANDBY,connected=False,launch_pending=True,title='Đang mở nội dung…',
                   queue=list(QUEUE) if PROVIDER=='youtube' else [],nonstop=NONSTOP if PROVIDER=='youtube' else False,
-                  preferences=POLICY.summary(),volume_schedule=volume_policy(),spotify_ad_filter=SPOTIFY_AD_FILTER,error='')
+                  preferences=POLICY.summary(),volume_schedule=volume_policy(),spotify_ad_filter=SPOTIFY_AD_FILTER,
+                  manual_pause=MANUAL_PAUSE,error='',playback_phase='opening')
     else:data=player_status()
+    if not WAKE_URL:
+        if data.get('login_required'):data['playback_phase']='login'
+        elif data.get('launch_pending') or data.get('buffering'):data['playback_phase']='loading'
+        elif WAKE_ERROR and not data.get('ad'):data['error']=WAKE_ERROR
     try:data['shortcuts']=SHORTCUTS.rows()
     except (OSError,ValueError,TypeError,AttributeError):
         data['shortcuts']=[];data['shortcut_error']='Không đọc được danh sách ghim; dữ liệu hiện có được giữ nguyên.'
     data['bluetooth_guard']=BT_GUARD.summary()
     data['command']=RECEIPT.observe(data)
+    command=data['command'] or {}
+    if not data.get('playback_phase') and command.get('state')=='pending' and command.get('action')=='play' and not data.get('ad'):
+        data['playback_phase']='confirming' if data.get('has_video') else 'loading'
     data['youtube_quality']=YOUTUBE_QUALITY
     data['provider']=PROVIDER
     data['youtube_nonstop']=NONSTOP
@@ -385,7 +400,7 @@ def status():
 
 
 def select_source(source):
-    global PROVIDER,SPOTIFY_PENDING,ERROR,WS,WS_TARGET,VOLUME_SCRIPT,HOOK_VOLUME,WAKE_URL
+    global PROVIDER,SPOTIFY_PENDING,ERROR,WS,WS_TARGET,VOLUME_SCRIPT,HOOK_VOLUME,WAKE_URL,WAKE_ERROR
     if source not in ('youtube','spotify'):raise ValueError('Nguồn phát không hợp lệ')
     if STANDBY:raise ValueError('Bật Media trước khi chọn nguồn phát')
     open_browser()
@@ -403,16 +418,26 @@ def select_source(source):
         PROVIDER=source
         save_nonstop()
     except Exception:PROVIDER=previous;raise
-    SPOTIFY_PENDING=0;WAKE_URL='';ERROR=''
+    SPOTIFY_PENDING=0;WAKE_URL='';WAKE_ERROR='';ERROR=''
     return status()
 
 
 def spotify_dispatch(d):
-    global SPOTIFY_URL,SPOTIFY_AD_FILTER,SPOTIFY_PENDING,MANUAL_PAUSE,VOLUME,ERROR
+    global SPOTIFY_URL,SPOTIFY_AD_FILTER,SPOTIFY_PENDING,MANUAL_PAUSE,VOLUME,ERROR,WAKE_ERROR
     action=d.get('action')
     if STANDBY:raise ValueError('Bật Media trước khi điều khiển Spotify')
     if action=='spotify_login':
         cdp('Page.navigate',{'url':spotify.LOGIN});SPOTIFY_PENDING=0
+    elif action=='spotify_reload':
+        if WAKE_URL or MANUAL_PAUSE or POLICY.sleep_state()['expired'] or BT_GUARD.latched:
+            raise ValueError('Media đang mở hoặc đang tạm dừng. Bấm Phát khi muốn nghe tiếp.')
+        if not spotify.is_page(target().get('url')):
+            raise ValueError('Mở Spotify Web Player trên Pi trước khi tải lại.')
+        SPOTIFY_PENDING=0
+        SPOTIFY_AD_GUARD.reset()
+        cdp('Page.reload',{'ignoreCache':False})
+        WAKE_ERROR=''
+        return dict(status(),recovery_requested=True)
     elif action=='spotify_filter':
         enabled=d.get('enabled')
         if type(enabled) is not bool:raise ValueError('Lọc quảng cáo cần giá trị bật/tắt')
@@ -588,8 +613,10 @@ def playlist_tick():
 
 def play_destination(provider, value):
     """One navigation per explicit selection; cold browser work is deferred."""
-    global PROVIDER,MANUAL_PAUSE,SPOTIFY_URL,WAKE_URL,WAKE_UNTIL,VOLUME,SPOTIFY_PENDING,YOUTUBE_PENDING
+    global PROVIDER,MANUAL_PAUSE,SPOTIFY_URL,WAKE_URL,WAKE_UNTIL,WAKE_ERROR,VOLUME,SPOTIFY_PENDING,YOUTUBE_PENDING
     value=destination(provider,value)
+    if provider=='youtube' and '/watch?' in value and POLICY.reason(youtube_url(value).split('v=')[1],automatic=False):
+        raise ValueError('Bài này đang bị chặn; bỏ chặn trong danh sách Không thích trước')
     if BT_GUARD.latched:release_bluetooth()
     before={}
     if POLICY.sleep_state()['expired']:
@@ -603,14 +630,19 @@ def play_destination(provider, value):
             PROVIDER,MANUAL_PAUSE,SPOTIFY_URL=old_provider,old_pause,old_url
             raise
     else:
+        # The browser can exit while the persisted standby flag is still false.
+        try:browser_ready=bool(pages())
+        except OSError:browser_ready=False
+        if not browser_ready:open_browser()
         if PROVIDER!=provider:
             try:
-                if PROVIDER=='spotify':evaluate(spotify.PAUSE_JS);spotify.ad_filter(evaluate,False,False)
-                else:evaluate('(()=>{const v=document.querySelector("video");if(v)v.pause();return true})()')
+                if browser_ready:
+                    if PROVIDER=='spotify':evaluate(spotify.PAUSE_JS);spotify.ad_filter(evaluate,False,False)
+                    else:evaluate('(()=>{const v=document.querySelector("video");if(v)v.pause();return true})()')
             except Exception:pass
             PROVIDER=provider
     MANUAL_PAUSE=False;SPOTIFY_PENDING=0;YOUTUBE_PENDING=None
-    WAKE_URL=value;WAKE_UNTIL=time.monotonic()+45
+    WAKE_URL=value;WAKE_UNTIL=time.monotonic()+30;WAKE_ERROR=''
     result=status()
     RECEIPT.begin('play',before,dict(provider=provider,url=value))
     result['command']=RECEIPT.observe(result)
@@ -620,7 +652,11 @@ def play_destination(provider, value):
 def search_browser():
     """Explicit search may open a resting browser, without resuming old audio."""
     global STANDBY,MANUAL_PAUSE,WAKE_URL,SPOTIFY_PENDING,YOUTUBE_PENDING
-    if not STANDBY:return
+    if not STANDBY:
+        try:browser_ready=bool(pages())
+        except OSError:browser_ready=False
+        if not browser_ready:open_browser()
+        return
     old_pause=MANUAL_PAUSE
     STANDBY=False;MANUAL_PAUSE=True;WAKE_URL='';SPOTIFY_PENDING=0;YOUTUBE_PENDING=None
     try:open_browser();save_nonstop()
@@ -635,6 +671,11 @@ def run_command(payload):
     if action in ('apps','app_status','app_command'):return native_dispatch(payload)
     if action=='status':return status()
     if action=='catalog_status':return CATALOG.status()
+    if action=='spotify_reload':
+        if PROVIDER!='spotify':raise ValueError('Chọn Spotify trước khi tải lại.')
+        result=spotify_dispatch(payload)
+        RECEIPT.receipt=None
+        return dict(result,command=None)
     if action=='catalog_search':
         from media_catalog import query
         query(payload.get('provider'),payload.get('query'),payload.get('kind'))
@@ -646,6 +687,9 @@ def run_command(payload):
     if action in ('catalog_play','shortcut_play'):
         item=SHORTCUTS.get(payload.get('id')) if action=='shortcut_play' else payload
         return play_destination(item.get('provider'),item.get('url'))
+    if action=='toggle' and PROVIDER=='youtube' and LAST_URL and not WAKE_URL:
+        if not player_status().get('has_video'):
+            return play_destination('youtube',LAST_URL)
     tracked=('play','shortcut_play','toggle','next','volume','seek','source','power','start')
     before=player_status() if action in tracked else {}
     expected={}
@@ -674,7 +718,7 @@ def run_command(payload):
     return result
 
 def dispatch(d):
-    global ERROR,END_LATCH,VOLUME,NONSTOP,MANUAL_PAUSE,LAST_URL,RECOVERY_AT,RECOVERY_COUNT,NONSTOP_NOTE,VOLUME_SCHEDULE,POLICY_NOTE,WAKE_URL,YOUTUBE_LIST,YOUTUBE_PENDING,YOUTUBE_QUALITY,QUALITY_AT
+    global ERROR,END_LATCH,VOLUME,NONSTOP,MANUAL_PAUSE,LAST_URL,RECOVERY_AT,RECOVERY_COUNT,NONSTOP_NOTE,VOLUME_SCHEDULE,POLICY_NOTE,WAKE_URL,WAKE_ERROR,YOUTUBE_LIST,YOUTUBE_PENDING,YOUTUBE_QUALITY,QUALITY_AT
     action=d.get('action','status')
     if action=='audio':
         payload=d.get('payload')
@@ -762,11 +806,13 @@ def dispatch(d):
         return status()
     if action=='nonstop':
         if type(d.get('enabled'))!=bool:raise ValueError('Nonstop cần giá trị bật/tắt')
-        NONSTOP=d['enabled'];MANUAL_PAUSE=False;RECOVERY_AT=0;RECOVERY_COUNT=0
-        current=status()
-        if current.get('url'):LAST_URL=current['url']
-        if current.get('has_video'):VOLUME=current.get('volume',VOLUME)
-        NONSTOP_NOTE='Đang theo dõi' if NONSTOP else 'Đã tắt';save_nonstop();return status()
+        previous=NONSTOP
+        NONSTOP=d['enabled']
+        try:save_nonstop()
+        except Exception:NONSTOP=previous;raise
+        RECOVERY_AT=0;RECOVERY_COUNT=0
+        NONSTOP_NOTE='Đang theo dõi' if NONSTOP else 'Đã tắt'
+        return status()
     if action in ('play','enqueue'):
         if action=='play':
             value=youtube_destination(d.get('url'))
@@ -820,6 +866,7 @@ def dispatch(d):
                 n=limited_volume(n)
                 cmd=f'window.__piMediaVolume={n}/100;v.volume={n}/100;v.muted=false'
         evaluate('(async()=>{const v=document.querySelector("video");if(!v)throw Error("No video");'+cmd+';return true})()')
+        if action=='toggle':WAKE_ERROR=''
         if action=='volume':
             VOLUME=n
             install_volume_hook(n)
@@ -844,11 +891,14 @@ return true;
 
 def nonstop_tick(s,now=None):
     global LAST_URL,LAST_PROGRESS,PROGRESS_AT,RECOVERY_AT,RECOVERY_COUNT,NONSTOP_NOTE
-    if STANDBY or PROVIDER!='youtube':return
+    if STANDBY or WAKE_URL or YOUTUBE_PENDING or BT_GUARD.latched or PROVIDER!='youtube':return
     now=time.monotonic() if now is None else now
     if POLICY.sleep_state()['expired']:NONSTOP_NOTE='Hết hẹn giờ ngủ; bấm Phát để nghe tiếp';return
     if not NONSTOP:return
-    if MANUAL_PAUSE:NONSTOP_NOTE='Bạn đã tạm dừng; bấm Phát để tiếp tục';return
+    if MANUAL_PAUSE or WAKE_ERROR:NONSTOP_NOTE='Bấm Phát để tiếp tục';return
+    command=s.get('command') or {}
+    if command.get('action') in ('play','shortcut_play') and command.get('state') in ('pending','unconfirmed'):
+        if not s.get('has_video') or s.get('paused') or command['state']=='pending':return
     if s.get('url'):LAST_URL=s['url']
     progress=(s.get('url'),round(s.get('position',0)))
     if s.get('has_video') and progress!=LAST_PROGRESS:
@@ -900,7 +950,9 @@ def advance_loop():
                 except Exception:pass
                 continue
             if PROVIDER=='spotify':
-                try:resume_tick();spotify_tick()
+                try:
+                    if WAKE_URL:resume_tick()
+                    if not WAKE_URL:spotify_tick()
                 except Exception:ERROR='Chưa điều khiển được Spotify; kiểm tra Web Player trên Pi.'
                 continue
             SPOTIFY_AD_GUARD.reset()
@@ -909,18 +961,21 @@ def advance_loop():
                 except Exception:pass
             if not WAKE_URL and not QUEUE and not NONSTOP and not VOLUME_SCHEDULE['enabled'] and not POLICY.sleep and not POLICY.repeat['enabled'] and not POLICY.disliked and YOUTUBE_PENDING is None:continue
             try:
-                resume_tick()
+                if WAKE_URL:resume_tick()
+                if WAKE_URL:continue
                 playlist_tick()
                 s=status()
                 if s.get('connected'):ERROR=''
                 volume_tick(s)
                 if sleep_tick(s):continue
+                if s.get('playback_phase') in ('loading','confirming') and (s.get('command') or {}).get('state')=='pending':
+                    continue
                 if preference_tick(s):continue
                 nonstop_tick(s)
                 if QUEUE and s.get('connected') and s.get('ended') and not s.get('ad') and not END_LATCH and not MANUAL_PAUSE:
                     END_LATCH=True
                     move_next(s)
-            except Exception:ERROR=('Nonstop đang chờ thử lại; nếu có hộp thoại đăng nhập/keyring, xử lý trên Pi.' if NONSTOP else 'Chưa chuyển được bài tiếp theo; dùng nút Bài tiếp hoặc kiểm tra desktop.')
+            except Exception:ERROR=('Nonstop đang chờ thử lại.' if NONSTOP else 'Chưa chuyển được bài tiếp theo; dùng nút Bài tiếp hoặc kiểm tra desktop.')
 
 def native_dispatch(payload):
     action=payload.get('action')

@@ -47,4 +47,14 @@ class NonstopTests(unittest.TestCase):
         with patch.object(m,'status',return_value={'paused':True}),patch.object(m,'evaluate'):
             m.dispatch({'action':'toggle'});self.assertFalse(m.MANUAL_PAUSE)
 
+    def test_nonstop_setting_preserves_manual_pause(self):
+        m.MANUAL_PAUSE=True
+        with patch.object(m,'status',return_value={}):
+            for enabled in (False, True):
+                m.dispatch({'action':'nonstop','enabled':enabled})
+                self.assertTrue(json.loads(m.CONFIG.read_text())['manual_pause'])
+        with patch.object(m,'open_browser') as browser:
+            m.nonstop_tick({'connected':False},100)
+            browser.assert_not_called()
+
 if __name__=='__main__':unittest.main()

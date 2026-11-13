@@ -142,7 +142,7 @@ class LaunchTests(unittest.TestCase):
 
     def test_cross_provider_selection_navigates_once(self):
         from media_policy import PlaybackPolicy
-        with tempfile.TemporaryDirectory() as folder,patch.multiple(m,PROVIDER='youtube',STANDBY=False,MANUAL_PAUSE=False,SPOTIFY_PENDING=0,SPOTIFY_URL='https://open.spotify.com/',CONFIG=Path(folder)/'config.json',POLICY=PlaybackPolicy(),WAKE_URL=''),patch.object(m,'player_status',return_value={}),patch.object(m,'status',return_value={}),patch.object(m,'evaluate',return_value=True),patch.object(m,'install_volume_hook'),patch.object(m,'cdp') as cdp,patch.object(m.BT_GUARD,'latched',False):
+        with tempfile.TemporaryDirectory() as folder,patch.multiple(m,PROVIDER='youtube',STANDBY=False,MANUAL_PAUSE=False,SPOTIFY_PENDING=0,SPOTIFY_URL='https://open.spotify.com/',CONFIG=Path(folder)/'config.json',POLICY=PlaybackPolicy(),WAKE_URL=''),patch.object(m,'pages',return_value=[{}]),patch.object(m,'player_status',return_value={}),patch.object(m,'status',return_value={}),patch.object(m,'evaluate',return_value=True),patch.object(m,'install_volume_hook'),patch.object(m,'cdp') as cdp,patch.object(m.BT_GUARD,'latched',False):
             url='https://open.spotify.com/playlist/'+'A'*22
             m.play_destination('spotify',url)
             cdp.assert_not_called();self.assertEqual(m.WAKE_URL,url)
@@ -157,6 +157,24 @@ class LaunchTests(unittest.TestCase):
             m.play_destination('spotify',url)
             power.assert_called_once_with(True);cdp.assert_not_called()
             self.assertEqual(m.WAKE_URL,url);self.assertFalse(m.MANUAL_PAUSE)
+
+    def test_link_reopens_browser_even_if_standby_flag_is_false(self):
+        url='https://www.youtube.com/watch?v=abcdefghijk'
+        with patch.multiple(m,PROVIDER='youtube',STANDBY=False,MANUAL_PAUSE=True,WAKE_URL='',
+                            WAKE_UNTIL=0,WAKE_ERROR=''),patch.object(m,'pages',side_effect=ConnectionRefusedError),patch.object(m,'open_browser') as browser,patch.object(m,'cdp') as cdp,patch.object(m.BT_GUARD,'latched',False):
+            result=m.play_destination('youtube',url)
+            browser.assert_called_once_with()
+            cdp.assert_not_called()
+            self.assertEqual(result['playback_phase'],'opening')
+
+    def test_spotify_reload_is_local_and_respects_holds(self):
+        url='https://open.spotify.com/playlist/'+'A'*22
+        with patch.multiple(m,PROVIDER='spotify',STANDBY=False,MANUAL_PAUSE=False,WAKE_URL='',WAKE_ERROR='',SPOTIFY_PENDING=0),patch.object(m,'target',return_value={'url':url}),patch.object(m,'cdp') as cdp,patch.object(m,'status',return_value={}),patch.object(m.BT_GUARD,'latched',True):
+            with self.assertRaises(ValueError):m.spotify_dispatch({'action':'spotify_reload'})
+            cdp.assert_not_called()
+            with patch.object(m.BT_GUARD,'latched',False):
+                self.assertTrue(m.spotify_dispatch({'action':'spotify_reload'})['recovery_requested'])
+            cdp.assert_called_once_with('Page.reload',{'ignoreCache':False})
 
 
 class PublicSpotifyMetadataTests(unittest.TestCase):

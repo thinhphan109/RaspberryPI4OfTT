@@ -24,7 +24,7 @@ class MediaPowerTests(unittest.TestCase):
             result = m.set_power(False)
             self.assertTrue(result['standby'])
             self.assertTrue(json.loads(m.CONFIG.read_text())['standby'])
-            self.assertEqual(run.call_args.args[0], ['systemctl','--user','stop','pi-media-browser'])
+            self.assertEqual(run.call_args.args[0], ['systemctl','--user','stop',m.unit('pi-media-browser')])
 
     def test_rest_status_and_nonstop_do_not_touch_browser(self):
         m.STANDBY = True
@@ -51,7 +51,7 @@ class MediaPowerTests(unittest.TestCase):
             m.set_power(True)
         self.assertFalse(m.STANDBY)
         self.assertFalse(json.loads(m.CONFIG.read_text())['standby'])
-        self.assertEqual(run.call_args.args[0],['systemctl','--user','start','pi-media-browser'])
+        self.assertEqual(run.call_args.args[0],['systemctl','--user','start',m.unit('pi-media-browser')])
 
     def test_invalid_payloads_and_failed_stop_do_not_change_latch(self):
         for value in (None, 0, 1, 'false'):

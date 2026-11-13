@@ -103,6 +103,16 @@ class ReceiptTests(unittest.TestCase):
         r.begin('seek', {}, {'position':10}, now=1)
         self.assertEqual(r.observe(dict(connected=True, position=10, position_known=False), now=2)['state'], 'pending')
 
+    def test_play_confirmation_requires_progress_and_ignores_ads(self):
+        r=CommandReceipt()
+        r.begin('play', {}, dict(provider='youtube',url=VIDEO), now=1)
+        state=dict(connected=True,has_video=True,paused=False,url=VIDEO,position_known=True,position=0)
+        self.assertEqual(r.observe(state, now=2)['state'], 'pending')
+        self.assertEqual(r.observe(state|{'position':2,'ad':True}, now=3)['state'], 'pending')
+        self.assertEqual(r.observe(state, now=4)['state'], 'pending')
+        self.assertEqual(r.observe(state, now=5)['state'], 'pending')
+        self.assertEqual(r.observe(state|{'position':1}, now=6)['state'], 'confirmed')
+
 
 class BluetoothGuardTests(unittest.TestCase):
     def test_only_loss_of_selected_bluetooth_route_latches_and_never_auto_resumes(self):

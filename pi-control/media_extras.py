@@ -2,6 +2,7 @@
 from copy import deepcopy
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -140,6 +141,7 @@ class CommandReceipt:
     def begin(self, action, before, expected, now=None):
         self.before = deepcopy(before)
         self.expected = deepcopy(expected)
+        self.play_sample = None
         self.deadline = (time.monotonic() if now is None else now)+(45 if action in ('play','shortcut_play','source','power','start') else 12)
         self.receipt = dict(id=secrets.token_hex(8), action=action, state='pending', message='Đang kiểm tra trạng thái phát…')
 
@@ -158,7 +160,8 @@ class CommandReceipt:
             self.receipt.update(state='unconfirmed',message=state.get('notice') or 'Nội dung không khả dụng trên Spotify.')
             return dict(self.receipt)
         ready = state.get('connected') and not state.get('login_required')
-        playing = ready and state.get('has_video') and state.get('paused') is False and not state.get('launch_pending')
+        playing = (ready and state.get('has_video') and state.get('paused') is False
+                   and not any(state.get(key) for key in ('launch_pending','buffering','ad','ended')))
         confirmed = False
         if action in ('play','shortcut_play'):
             target = expected.get('url', '')
@@ -166,6 +169,14 @@ class CommandReceipt:
             if expected.get('provider')=='spotify' and '/track/' in target:
                 matched=target==state.get('url') and state.get('track_matches') is True
             confirmed = playing and state.get('provider','youtube') == expected.get('provider') and matched
+            if 'position_known' in state:
+                position = state.get('position')
+                valid = confirmed and state['position_known'] and type(position) in (int,float) and math.isfinite(position)
+                sample = (self.identity(state), position) if valid else None
+                previous = self.play_sample
+                confirmed = bool(sample and previous and sample[0]==previous[0] and position>previous[1])
+                if not sample or not previous or sample[0]!=previous[0] or position<previous[1]:
+                    self.play_sample = sample
         elif action == 'toggle':
             confirmed = ready and state.get('has_video') and state.get('paused') is expected.get('paused')
         elif action == 'next':
@@ -183,7 +194,10 @@ class CommandReceipt:
         if confirmed:
             self.receipt.update(state='confirmed', message='Đã xác nhận trạng thái.' if action in ('play','shortcut_play','toggle','next','volume','seek','source','power','start') else 'Đã lưu thay đổi.')
         elif (time.monotonic() if now is None else now) >= self.deadline:
-            self.receipt.update(state='unconfirmed', message='Chưa xác nhận được thao tác. Kiểm tra trạng thái hoặc mở player trên Pi.')
+            message = ('Chưa thấy nội dung phát. Thử bấm Phát lại hoặc kiểm tra cửa sổ Media trên Pi.'
+                       if action in ('play','shortcut_play') else
+                       'Chưa xác nhận được thao tác. Kiểm tra trạng thái hoặc mở player trên Pi.')
+            self.receipt.update(state='unconfirmed', message=message)
         return dict(self.receipt)
 
 
