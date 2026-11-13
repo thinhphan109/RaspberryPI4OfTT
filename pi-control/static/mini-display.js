@@ -197,8 +197,9 @@
     function preview() {
         const state = mode();
         const simulated = {
-            pending: 'rescue', hotspot: 'rescue', offline: 'rescue', playing: 'music',
-            power: 'health', hot: 'health', disk: 'storage', boot: 'boot', shutdown: 'boot'
+            pending: 'rescue', hotspot: 'rescue', offline: 'rescue', playing: 'music', paused: 'music',
+            sleep: 'audio', healthy: 'health', power: 'health', hot: 'health',
+            disk: 'storage', boot: 'boot', shutdown: 'boot'
         };
         if (simulated[state]) return simulated[state];
         if (selected) return selected;
@@ -293,7 +294,7 @@
                     ctx.imageSmoothingEnabled = false;
                     ctx.drawImage(qr, 192, 56, 111, 111);
                 }
-                cat(id, 64, 120, 73);
+                cat('hotspot', 56, 111, 85);
                 divider(197);
                 text(ip === '192.168.50.1' ? 'Kết nối Wi-Fi rồi quét QR' : 'Kết nối Wi-Fi rồi mở địa chỉ trên',
                     16, 224, 14, white, font, 288);
@@ -302,7 +303,8 @@
             } else {
                 const status = state === 'offline' ? 'Mất kết nối mạng' : state === 'pending' ? rescueStates['connection-pending'] :
                     rescueStates[metrics.guard?.state] || (network?.ip ? 'Wi-Fi đang hoạt động' : 'Chưa nhận địa chỉ IP');
-                side(id);
+                side(state === 'offline' || (!simulated && network && !ip &&
+                    metrics.guard?.state !== 'connection-pending') ? 'offline' : id);
                 headline(status, 16, 96, 23, 180, tone);
                 text('Địa chỉ IP', 16, 153, 12, muted);
                 text(ip || 'Chưa nhận IP', 16, 178, 16, white, mono, 184);
@@ -311,25 +313,28 @@
                 reading = status;
             }
         } else if (id === 'health') {
-            const degrees = state === 'power' ? 47 : state === 'hot' ? 84 : metrics.temperature;
+            const degrees = state === 'hot' ? 84 : simulated ? 47 : metrics.temperature;
             const temperature = number(degrees, '°C');
-            const cpu = number(state === 'power' ? 18 : metrics.cpu, '%');
-            const ram = number(state === 'power' ? 26 : metrics.ram?.percent, '%');
-            side(id);
+            const cpu = number(simulated ? 18 : metrics.cpu, '%');
+            const ram = number(simulated ? 26 : metrics.ram?.percent, '%');
+            const lowPower = state === 'power' || (!simulated && metrics.power?.undervoltage);
+            const healthy = state === 'healthy' || (!simulated && metrics.power?.status === 'healthy' &&
+                !metrics.stale && Number.isFinite(degrees) && degrees < 80);
+            side(lowPower ? 'power' : healthy ? 'healthy' : id);
             text('Nhiệt độ SoC', 16, 64, 13, muted);
             text(temperature, 13, 120, 48, tone, mono, 184);
             bar(Number.isFinite(degrees) ? degrees / 85 : null, 16, 132, 182, tone);
-            const power = state === 'hot' ? 'Nhiệt độ cao' : state === 'power' || metrics.power?.undervoltage ? 'Nguồn yếu' :
+            const power = state === 'hot' ? 'Nhiệt độ cao' : lowPower ? 'Nguồn yếu' : healthy ? 'Nguồn ổn định' :
                 metrics.power?.throttled ? 'Đang giảm xung' :
                     metrics.power?.status === 'warning' ? 'Từng có cảnh báo nguồn/nhiệt' :
                         metrics.power?.status === 'healthy' ? 'Nguồn ổn định' : 'Chưa đọc được nguồn';
             text(power, 16, 174, 13, warning ? tone : muted, font, 183);
-            const uptime = state === 'power' ? 7320 : metrics.uptime;
+            const uptime = simulated ? 7320 : metrics.uptime;
             const uptimeText = uptimeLabel(uptime).replace(' ngày', 'n').replace(' giờ', 'g').replace(' phút', 'p');
             details([['CPU', cpu], ['RAM', ram], ['Đã chạy', uptimeText]]);
             reading = temperature + ' · CPU ' + cpu + ' · RAM ' + ram + ' · ' + power;
         } else if (id === 'storage') {
-            side('bambu');
+            side('storage');
             text('Đã dùng dung lượng', 16, 64, 13, muted);
             text('94%', 14, 119, 48, amber, mono, 184);
             bar(0.94, 16, 132, 182, amber);
@@ -337,21 +342,23 @@
             details([['Phân vùng', 'Ổ dữ liệu'], ['Còn trống', '4.0 GiB'], ['Tổng', '66.4 GiB']]);
             reading = 'Mô phỏng ổ dữ liệu đã dùng 94%, còn trống 4.0 GiB.';
         } else if (id === 'music') {
-            const song = state === 'playing' ? {title: 'Nhạc để tập trung', provider: 'youtube', position: 65, duration: 210} : media;
+            const song = simulated ? {title: 'Nhạc để tập trung', provider: 'youtube', position: 65,
+                duration: 210, paused: state === 'paused'} : media;
             const provider = song?.provider === 'spotify' ? 'Spotify' : song?.provider === 'youtube' ? 'YouTube' : 'Media';
             const known = song?.position_known !== false && Number.isFinite(song?.position) && song?.duration > 0;
-            side(id);
+            side(song?.title && song.paused ? 'paused' : id);
             text(provider, 16, 64, 13, accent);
             headline(song?.title || 'Chưa có bài đang phát', 16, 96, 21, 183);
             if (song?.artist) text(song.artist, 16, 151, 13, muted, font, 182);
             bar(known ? song.position / song.duration : null, 16, 176, 182);
             details([['Đã phát', known ? remaining(song.position) : '—'], ['Thời lượng', known ? remaining(song.duration) : '—'],
                 ['Trạng thái', !song?.title ? 'Đang chờ' : song.paused ? 'Tạm dừng' : 'Đang phát']]);
-            reading = song?.title || 'Chưa có bài đang phát';
+            reading = song?.title ? song.title + (song.paused ? ' · Tạm dừng' : '') : 'Chưa có bài đang phát';
         } else if (id === 'audio') {
-            const output = audio?.devices?.find(item => item.kind === 'output' && item.name === audio.defaults?.output);
-            const sleep = media?.preferences?.sleep;
-            side(id);
+            const output = state === 'sleep' ? {label: 'Loa', volume: 25} :
+                audio?.devices?.find(item => item.kind === 'output' && item.name === audio.defaults?.output);
+            const sleep = state === 'sleep' ? {active: true, remaining: 900} : media?.preferences?.sleep;
+            side(sleep?.active ? 'sleep' : id);
             text('Âm lượng loa', 16, 64, 13, muted);
             text(output?.muted ? 'Tắt tiếng' : number(output?.volume, '%'), 14, 119, output?.muted ? 28 : 45, tone, mono, 184);
             bar(Number.isFinite(output?.volume) ? (output.muted ? 0 : output.volume / 100) : null, 16, 132, 182);
@@ -368,7 +375,7 @@
             reading = 'Đồng hồ giờ Việt Nam';
         } else if (id === 'boot') {
             const title = state === 'shutdown' ? 'Đang tắt…' : 'Đang khởi động';
-            side(id);
+            side(state === 'shutdown' ? 'shutdown' : id);
             headline(state === 'live' ? 'Chọn tình huống' : title, 16, 99, 24, 185);
             text(state === 'shutdown' ? 'Chờ hệ thống dừng' : state === 'boot' ? 'Đang chờ kết nối mạng' : 'Khởi động hoặc tắt máy',
                 16, 176, 13, muted, font, 183);

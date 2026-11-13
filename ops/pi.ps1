@@ -53,6 +53,8 @@ try {
             'pi-control/mini_display_store.py',
             'pi-control/static/mini-cat/network.png','pi-control/static/mini-cat/rescue.png','pi-control/static/mini-cat/health.png','pi-control/static/mini-cat/music.png',
             'pi-control/static/mini-cat/audio.png','pi-control/static/mini-cat/clock.png','pi-control/static/mini-cat/boot.png','pi-control/static/mini-cat/bambu.png',
+            'pi-control/static/mini-cat/offline.png','pi-control/static/mini-cat/storage.png','pi-control/static/mini-cat/power.png','pi-control/static/mini-cat/shutdown.png',
+            'pi-control/static/mini-cat/paused.png','pi-control/static/mini-cat/sleep.png','pi-control/static/mini-cat/healthy.png','pi-control/static/mini-cat/hotspot.png',
             'pi-control/static/raspberry-pi.png','pi-control/static/fonts/noto-sans.woff2','pi-control/static/fonts/OFL.txt',
             'pi-control/systemd/piwifi-guard.service','pi-control/systemd/piwifi-guard.timer',
             'pi-control/helper/piwifi-helper','pi-control/systemd/piwifi-web.service',
