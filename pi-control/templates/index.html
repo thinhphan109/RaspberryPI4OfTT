@@ -744,8 +744,27 @@
                     </div>
                     <div class="service-help-list">
                     {% for service in service_help_rows %}
-                        <div class="service-help-item"><div><strong>{{service.label}}</strong><code>{{service.unit}}</code></div><button type="button" class="btn btn-outline btn-sm" data-service-help="{{service.id}}">Trợ giúp</button></div>
-                        <dialog class="service-help-dialog" id="service-help-{{service.id}}" aria-labelledby="service-title-{{service.id}}"><h3 id="service-title-{{service.id}}">{{service.label}}</h3><p><code>{{service.unit}}</code> · {{'Phiên người dùng' if service.scope=='user' else 'Hệ thống'}}</p><dl><dt>Chức năng</dt><dd>{{service.purpose}}</dd><dt>Khi dừng / khởi động lại</dt><dd>{{service.stop_impact}}</dd><dt>Trạng thái không chạy</dt><dd>{{service.normal_inactive}}</dd><dt>Phụ thuộc</dt><dd>{{service.dependencies|join(', ') or 'Không có phụ thuộc ứng dụng khác'}}</dd></dl><button type="button" class="btn btn-primary" data-service-close>Đóng</button></dialog>
+                        <div class="service-help-item">
+                            <div><strong>{{service.label}}</strong><code>{{service.unit}}</code></div>
+                            <button type="button" class="btn btn-outline btn-sm" data-service-help="{{service.id}}" aria-haspopup="dialog" aria-controls="service-help-{{service.id}}" aria-label="Trợ giúp · {{service.label}}">Trợ giúp</button>
+                        </div>
+                        <dialog class="service-help-dialog" id="service-help-{{service.id}}" aria-labelledby="service-title-{{service.id}}">
+                            <header class="service-help-header">
+                                <div>
+                                    <h3 id="service-title-{{service.id}}">{{service.label}}</h3>
+                                    <p><code>{{service.unit}}</code> · {{'Phiên người dùng' if service.scope=='user' else 'Hệ thống'}}</p>
+                                </div>
+                                <button type="button" class="btn btn-ghost help-close" data-service-close aria-label="Đóng trợ giúp" autofocus>×</button>
+                            </header>
+                            <div class="service-help-body">
+                                <dl>
+                                    <dt>Chức năng</dt><dd>{{service.purpose}}</dd>
+                                    <dt>Khi dừng hoặc khởi động lại</dt><dd>{{service.stop_impact}}</dd>
+                                    <dt>Khi nào có thể không chạy</dt><dd>{{service.normal_inactive}}</dd>
+                                    <dt>Phụ thuộc</dt><dd>{{service.dependencies|join(', ') or 'Không có phụ thuộc ứng dụng khác'}}</dd>
+                                </dl>
+                            </div>
+                        </dialog>
                     {% endfor %}
                     </div>
                 </article>

@@ -2,7 +2,35 @@
     <header class="page-header">
         <div><h1 class="page-title" id="mini-display-title">Màn hình mini</h1>
         <p class="text-muted">Màn phụ ST7789 · 2,4 inch</p></div>
+        <button type="button" class="btn btn-outline page-help" data-service-help="mini-display" aria-haspopup="dialog" aria-controls="service-help-mini-display" aria-label="Trợ giúp màn hình mini">{{ icon('help') }}</button>
     </header>
+    <dialog class="service-help-dialog mini-help-dialog" id="service-help-mini-display" aria-labelledby="mini-help-title">
+        <header class="service-help-header">
+            <div>
+                <h2 id="mini-help-title">Màn hình mini</h2>
+                <p>ST7789 · 2,4 inch · 320 × 240 ngang</p>
+            </div>
+            <button type="button" class="btn btn-ghost help-close" data-service-close aria-label="Đóng trợ giúp" autofocus>×</button>
+        </header>
+        <div class="service-help-body">
+            <p class="mini-help-intro">Xem trạng thái Pi, mã QR cứu hộ hoặc phát lặp GIF và video. Có thể thử ngay trên Dashboard trước khi gắn màn.</p>
+            <table class="mini-pinout">
+                <caption>Đấu SPI0 tham khảo · Raspberry Pi 4</caption>
+                <thead><tr><th scope="col">Chân màn</th><th scope="col">Chân vật lý Pi</th><th scope="col">Tín hiệu</th></tr></thead>
+                <tbody>
+                    <tr><th scope="row">VCC*</th><td>1</td><td>3,3 V</td></tr>
+                    <tr><th scope="row">GND</th><td>6</td><td>GND</td></tr>
+                    <tr><th scope="row">SCK / SCL</th><td>23</td><td>GPIO11 · SCLK</td></tr>
+                    <tr><th scope="row">SDA / MOSI</th><td>19</td><td>GPIO10 · MOSI</td></tr>
+                    <tr><th scope="row">CS</th><td>24</td><td>GPIO8 · CE0</td></tr>
+                    <tr><th scope="row">DC / A0</th><td>22</td><td>GPIO25 · đề xuất</td></tr>
+                    <tr><th scope="row">RST / RES</th><td>13</td><td>GPIO27 · đề xuất</td></tr>
+                </tbody>
+            </table>
+            <p class="mini-pinout-note">* Chỉ dùng chân 1 nếu module hỗ trợ nguồn 3,3 V. Xem chữ in trên mạch và thông số chân BL/LED trước khi cấp nguồn. Bảng dành cho phần hiển thị.</p>
+            <a class="mini-pinout-link" href="https://www.raspberrypi.com/documentation/computers/raspberry-pi.html#pin-gpio-mappings" target="_blank" rel="noopener">Đối chiếu chân SPI trong tài liệu Raspberry Pi</a>
+        </div>
+    </dialog>
     <div class="mini-workspace">
         <div class="mini-preview">
             <div class="mini-bezel">

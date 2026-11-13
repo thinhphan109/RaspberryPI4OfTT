@@ -64,11 +64,6 @@
       "label": "Truy cập từ xa", "kind": "configure-after-install", "requires": [],
       "packages": [], "files": [],
       "services": [{"id":"tunnel","unit":"cloudflared.service","legacy_unit":"cloudflared.service","scope":"system","activation":"continuous","label":"Cloudflare Tunnel","purpose":"Đưa Dashboard ra tên miền khi có Internet và thông tin tunnel hợp lệ.","stop_impact":"Mất truy cập qua tên miền; Dashboard qua LAN vẫn hoạt động.","normal_inactive":"Bình thường nếu chưa cấu hình truy cập ngoài mạng.","dependencies":["Internet","Cloudflare account"]}]
-    },
-    "robot": {
-      "label": "EdgeVision Robot", "kind": "external-project", "requires": [],
-      "packages": [], "files": [],
-      "services": [{"id":"robot","unit":"edgevision-robot.service","legacy_unit":"edgevision-robot.service","scope":"user","activation":"on-demand","label":"Ứng dụng EdgeVision Robot","purpose":"Dự án thị giác/robot riêng, có bộ cài và dữ liệu riêng. Cần điều phối quyền dùng webcam với Camera.","stop_impact":"Ứng dụng robot/mô phỏng dừng; không đồng nghĩa dừng các module Pi Control khác.","normal_inactive":"Bình thường khi chưa deploy hoặc không sử dụng dự án robot.","dependencies":["external project","camera ownership"]}]
     }
   }
 }

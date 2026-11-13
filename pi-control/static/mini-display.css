@@ -1,4 +1,14 @@
 .mini-workspace{display:grid;grid-template-columns:minmax(0,500px) minmax(0,480px);gap:clamp(20px,4vw,44px);align-items:start}
+#mini-display .page-help { width: 44px; min-height: 44px; padding: 0; flex: none; }
+#mini-display .page-help svg { width: 20px; height: 20px; }
+.mini-help-dialog { width: min(420px, calc(100% - 32px)); }
+.mini-help-intro { margin: 0 0 12px; color: var(--text-muted); font-size: 13px; line-height: 1.55; }
+.mini-pinout { width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
+.mini-pinout caption { margin-bottom: 6px; text-align: left; font-size: 13px; font-weight: 650; }
+.mini-pinout :is(th, td) { padding: 5px 4px; border-bottom: 1px solid var(--border); text-align: left; }
+.mini-pinout thead th { color: var(--text-muted); font-weight: 500; }
+.mini-pinout-note { margin: 10px 0 6px; color: var(--text-muted); font-size: 12px; line-height: 1.55; }
+.mini-pinout-link { font-size: 12px; text-decoration: underline; text-underline-offset: 2px; }
 .mini-preview,.mini-settings{min-width:0}
 .mini-preview{padding:16px;background:var(--bg-surface);border:1px solid var(--border);border-radius:14px}
 .mini-bezel{position:relative;width:100%;padding:10px;margin:0 auto;background:#1a2028;border:1px solid #343d48;border-radius:15px}
