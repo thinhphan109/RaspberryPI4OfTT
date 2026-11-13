@@ -27,6 +27,7 @@ import hub
 import media
 import camera
 import audio_client
+import robotvision
 from service_catalog import help_rows
 import base64
 import hashlib
@@ -179,9 +180,11 @@ def security_check():
     if request.endpoint in {"login", "static"}:
         return None
     if not logged_in():
-        return redirect(url_for("login"))
+        return redirect(url_for("login",**({'next':'robotvision'} if request.path.startswith('/robotvision') else {})))
     if "csrf" not in session:
         session["csrf"] = secrets.token_hex(24)
+    if request.endpoint=='robotvision_page' and request.method=='POST':
+        request.max_content_length=3*1024*1024
     return None
 
 
@@ -194,6 +197,13 @@ def check_csrf():
     expected = session.get("csrf", "")
     if not expected or not hmac.compare_digest(supplied, expected):
         raise RuntimeError("CSRF token không hợp lệ")
+
+
+@app.route('/robotvision',defaults={'path':''},methods=['GET','POST'])
+@app.route('/robotvision/',defaults={'path':''},methods=['GET','POST'])
+@app.route('/robotvision/<path:path>',methods=['GET','POST'])
+def robotvision_page(path):
+    return robotvision.proxy(request,session,Response)
 
 
 @app.route('/api/media', methods=['GET','POST'])
@@ -287,6 +297,7 @@ def login():
             session.clear()
             session["logged_in"] = True
             session["csrf"] = secrets.token_hex(24)
+            if request.args.get('next')=='robotvision':return redirect('/robotvision/')
             return redirect(url_for("index"))
         error = "Sai username hoặc password"
 
