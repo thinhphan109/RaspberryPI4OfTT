@@ -132,7 +132,10 @@ class Catalog:
             if self.state['running']:
                 raise ValueError('Đang tìm kiếm; chờ hoàn tất trước khi tìm tiếp')
             cached = self.cache.get((provider, value,kind))
-            self.state.update(running=not bool(cached and time.monotonic()-cached[0] < 300),
+            if cached and time.monotonic()-cached[0] >= 300:
+                self.cache.pop((provider,value,kind))
+                cached = None
+            self.state.update(running=not bool(cached),
                               rows=deepcopy(cached[1]) if cached else [], message='Đang tìm trên Pi…',
                               provider=provider, query=value, kind=kind,revision=self.state['revision']+1)
             if not self.state['running']:
@@ -200,8 +203,12 @@ class Catalog:
                 if not search_ready(provider,value,kind,raw):
                     time.sleep(.4);continue
                 found = results(provider, raw)
-                if found!=rows:changed_at=time.monotonic()
-                rows=found
+                if found and found!=rows:
+                    rows=found
+                    changed_at=time.monotonic()
+                    with self.lock:
+                        self.state.update(rows=deepcopy(rows),
+                                          message=f'Đã tìm thấy {len(rows)} kết quả · đang kiểm tra thêm…')
                 if rows:
                     if first_rows_at is None:first_rows_at=time.monotonic()
                     if len(rows)>=12 or time.monotonic()-first_rows_at>=3 and time.monotonic()-changed_at>=1.2:break

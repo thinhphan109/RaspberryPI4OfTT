@@ -62,6 +62,25 @@ class CatalogTests(unittest.TestCase):
                 cat.worker('youtube','music','https://www.youtube.com/results?search_query=music')
             self.assertEqual(len(cat.status()['rows']),1);self.assertGreaterEqual(len(attempts),2);self.assertFalse(cat.owned)
 
+    def test_results_are_usable_before_background_search_finishes(self):
+        with tempfile.TemporaryDirectory() as folder:
+            cat=c.Catalog(Path(folder)/'target.json')
+            cat.state['running']=True
+            browser=Mock();browser.call.side_effect=[{'targetId':'temporary'},{'success':True}]
+            page=Mock()
+            samples=[]
+            def call(method,params=None):
+                if method!='Runtime.evaluate':return {}
+                samples.append(cat.status())
+                rows=[dict(url='https://youtu.be/abcdefghijk',title='Music')] if len(samples)==1 else []
+                return {'result':{'value':{'ready':True,'query':'music','rows':rows}}}
+            page.call.side_effect=call
+            with patch.object(cat,'recover'),patch.object(cat,'browser',return_value=browser),patch.object(c,'Connection',return_value=page):
+                cat.worker('youtube','music','https://www.youtube.com/results?search_query=music')
+            self.assertTrue(samples[1]['running'])
+            self.assertEqual(samples[1]['rows'][0]['title'],'Music')
+            self.assertEqual(cat.status()['rows'],samples[1]['rows'])
+
     def test_loading_or_wrong_query_is_not_a_completed_search(self):
         for raw in ({'rows':[{'title':'Footer'}]},dict(ready=False,query='music',kind='tracks'),dict(ready=True,query='previous',kind='tracks'),dict(ready=True,query='music',kind='playlists')):
             self.assertFalse(c.search_ready('spotify','music','tracks',raw))
