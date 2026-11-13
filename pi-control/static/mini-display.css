@@ -1,0 +1,61 @@
+.mini-workspace{display:grid;grid-template-columns:minmax(0,500px) minmax(0,480px);gap:clamp(20px,4vw,44px);align-items:start}
+.mini-preview,.mini-settings{min-width:0}
+.mini-preview{padding:16px;background:var(--bg-surface);border:1px solid var(--border);border-radius:14px}
+.mini-bezel{position:relative;width:100%;padding:10px;margin:0 auto;background:#1a2028;border:1px solid #343d48;border-radius:15px}
+.mini-bezel :is(canvas,img,video){display:block;width:100%;height:auto;aspect-ratio:4/3;background:#10151d;border-radius:6px}
+.mini-bezel [hidden]{display:none}
+.mini-ambient{position:absolute;inset:11px;overflow:hidden;border-radius:6px;pointer-events:none}
+.mini-ambient::before,.mini-ambient::after{content:"";position:absolute;inset:0;opacity:.4;animation:mini-glimmer 8s ease-in-out infinite alternate}
+.mini-ambient::before{
+    background:
+        radial-gradient(circle at 4% 29%,#ff8796 0 1px,transparent 2px),
+        radial-gradient(circle at 28% 17%,#80c8ed 0 1px,transparent 2px),
+        radial-gradient(circle at 43% 54%,#ffd684 0 1px,transparent 2px),
+        radial-gradient(circle at 64% 21%,#ff8796 0 1px,transparent 2px),
+        radial-gradient(circle at 94% 43%,#80c8ed 0 1.5px,transparent 2.5px),
+        radial-gradient(circle at 69% 78%,#a9d772 0 1px,transparent 2px),
+        radial-gradient(circle at 3% 94%,#ff8796 0 1px,transparent 2px);
+}
+.mini-ambient::after{
+    background:
+        radial-gradient(circle at 9% 21%,#ffd684 0 1px,transparent 2px),
+        radial-gradient(circle at 17% 79%,#80c8ed 0 1px,transparent 2px),
+        radial-gradient(circle at 47% 18%,#a9d772 0 1px,transparent 2px),
+        radial-gradient(circle at 61% 66%,#80c8ed 0 1px,transparent 2px),
+        radial-gradient(circle at 88% 25%,#ffd684 0 1px,transparent 2px),
+        radial-gradient(circle at 96% 73%,#ff8796 0 1px,transparent 2px),
+        radial-gradient(circle at 73% 96%,#80c8ed 0 1px,transparent 2px);
+    animation-delay:-5s;
+}
+@keyframes mini-glimmer{from{opacity:.22;transform:translateY(1px)}to{opacity:.62;transform:translateY(-2px)}}
+@media(prefers-reduced-motion:reduce){.mini-ambient::before,.mini-ambient::after{animation:none}}
+.mini-preview-meta{display:flex;justify-content:space-between;gap:8px;margin:11px 0 15px;color:var(--text-muted);font:11px/1.5 var(--font-mono)}
+.mini-preview label,.mini-options>label:first-child{display:block;margin-bottom:6px}
+.mini-preview select,.mini-options select{width:100%}
+.mini-reading{font-size:12px;color:var(--text-muted);margin:10px 0 0;overflow-wrap:anywhere}
+.mini-service{border-bottom:1px solid var(--border);margin-bottom:16px;padding:0 0 14px}
+.mini-settings .mini-service h2{margin:0 0 8px}
+.mini-source-options,.mini-upload-row{display:flex;align-items:center;gap:8px}
+.mini-source-options{margin-bottom:12px}
+.mini-source-options button[aria-pressed=true]{background:var(--bg-surface-subtle);border-color:var(--text-muted)}
+.mini-upload-row input{flex:1;min-width:0;max-width:100%;font-size:12px}
+.mini-upload-row button{flex:none}
+.mini-service small{display:block;margin-top:6px;color:var(--text-muted);font-size:11px}
+.mini-service-note-error{color:var(--danger, #f3a4a4)}
+.mini-settings h2{margin:0 0 5px;font-size:18px}.mini-settings>p{margin:0 0 10px;font-size:13px}
+.mini-pages{padding:0;margin:0;list-style:none}
+.mini-pages li{display:grid;grid-template-columns:26px minmax(0,1fr) 32px 32px;gap:5px;align-items:center;min-height:39px;border-bottom:1px solid var(--border)}
+.mini-pages li[data-selected=true]{background:var(--bg-surface-subtle)}
+.mini-pages li>input{justify-self:center;margin:0}
+.mini-pages button{margin:0;padding:5px;min-height:36px}
+.mini-pages .mini-page-name{text-align:left;justify-content:flex-start;min-width:0;white-space:normal}
+.mini-pages .mini-page-name small{display:block;color:var(--text-muted);font-size:11px}
+.mini-pages .mini-move svg{width:14px;height:14px}
+.mini-pages .mini-move:disabled{opacity:.38}
+.mini-options{margin-top:16px;display:grid;gap:7px}
+.mini-options>label:first-child{margin:0}
+.mini-check{display:flex;align-items:center;min-height:36px;gap:7px}
+.mini-check input{flex:none}
+.mini-actions{margin-top:10px}
+#mini-storage{margin-top:8px}
+@media(max-width:760px){.mini-workspace{grid-template-columns:1fr;gap:20px}.mini-preview{max-width:430px;width:100%;justify-self:center}.mini-pages li{min-height:49px}.mini-pages button{min-height:44px}}

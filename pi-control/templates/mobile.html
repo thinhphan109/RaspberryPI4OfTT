@@ -13,7 +13,7 @@
 <dialog id="mobile-menu" class="mobile-menu" aria-labelledby="mobile-menu-title">
     <div class="mobile-menu-heading"><div><span class="eyebrow">PI CONTROL</span><h2 id="mobile-menu-title">Thiết bị &amp; hệ thống</h2></div><button id="mobile-menu-close" class="btn btn-ghost" type="button" aria-label="Đóng menu">×</button></div>
     <nav class="mobile-menu-links" aria-label="Các mục hệ thống">
-        {% for tab,glyph,label,description in [('audio','headphones','Âm thanh','Loa, micro & Bluetooth'),('apps','apps','Ứng dụng & DNS','Ứng dụng và lọc tên miền'),('storage','storage','Lưu trữ','Ổ đĩa, lượng ghi & dịch vụ'),('activity','refresh','Hoạt động','Sự kiện & nhật ký hệ thống'),('gpio','cpu','GPIO','Tra cứu chân cắm phần cứng')] %}
+        {% for tab,glyph,label,description in [('audio','headphones','Âm thanh','Loa, micro & Bluetooth'),('apps','apps','Ứng dụng & DNS','Ứng dụng và lọc tên miền'),('storage','storage','Lưu trữ','Ổ đĩa, lượng ghi & dịch vụ'),('activity','refresh','Hoạt động','Sự kiện & nhật ký hệ thống'),('gpio','cpu','GPIO','Tra cứu chân cắm phần cứng'),('mini-display','display','Màn hình mini','Xem trước & chọn trang')] %}
         <a class="nav-item" href="#{{tab}}" data-tab="{{tab}}">{{icon(glyph)}}<span><strong>{{label}}</strong><small>{{description}}</small></span><span class="mobile-menu-arrow" aria-hidden="true">↗</span></a>
         {% endfor %}
     </nav>

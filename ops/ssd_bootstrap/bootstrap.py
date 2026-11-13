@@ -20,7 +20,7 @@ import uuid
 sys.dont_write_bytecode=True
 
 BASE=Path(__file__).resolve().parent
-MANAGED=('network','observer','audio','media','render','camera','dashboard','dns')
+MANAGED=('network','observer','audio','media','render','camera','dashboard','dns','display')
 
 
 def command(args,timeout=120):
@@ -177,6 +177,17 @@ def units(module,config):
         'pi-control-network-guard.service':'[Unit]\nDescription=Pi Control Wi-Fi recovery guard\nAfter=NetworkManager.service\nRequires=NetworkManager.service\n[Service]\nType=oneshot\nExecStart=/usr/local/sbin/piwifi-guard\nTimeoutStartSec=180\n[Install]\nAlias=piwifi-guard.service\n',
         'pi-control-network-guard.timer':'[Unit]\nDescription=Pi Control network recovery schedule\n[Timer]\nOnBootSec=60\nOnUnitInactiveSec=30\nUnit=pi-control-network-guard.service\n[Install]\nWantedBy=timers.target\nAlias=piwifi-guard.timer\n'}
     if module=='observer':return {'pi-control-observer.service':f'[Unit]\nDescription=Pi Control observer and selected event journal\nAfter=NetworkManager.service\n[Service]\nUser={user}\nGroup={user}\nWorkingDirectory={base}\nExecStart=/usr/bin/python3 -B {base}/observer.py\nStateDirectory=pi-control/observer\nStateDirectoryMode=0700\nRuntimeDirectory=pi-control-observer\nRuntimeDirectoryMode=0755\nProtectSystem=strict\nProtectHome=true\nPrivateTmp=true\nBindReadOnlyPaths=-/run/user/{uid}:/run/piwifi-camera-runtime\nEnvironment=PIWIFI_CAMERA_RUNTIME=/run/piwifi-camera-runtime\n{common}'+install+'Alias=piwifi-observer.service\n'}
+    if module == 'display':
+        return {'pi-control-display.service': (
+            '[Unit]\nDescription=Pi Control mini display and clip worker\n'
+            'After=pi-control-observer.service\nRequiresMountsFor=/srv/pi-control\n'
+            f'[Service]\nUser={user}\nGroup={user}\nWorkingDirectory={base}\n'
+            f'ExecStart=/usr/bin/python3 -B {base}/mini_display_service.py\n'
+            'RuntimeDirectory=pi-control-display\nRuntimeDirectoryMode=0700\n'
+            'UMask=0077\nPrivateTmp=true\nPrivateDevices=true\nProtectHome=true\n'
+            'NoNewPrivileges=true\nProtectSystem=strict\nReadWritePaths=/srv/pi-control/MiniDisplay\n'
+            'RestrictAddressFamilies=AF_UNIX AF_NETLINK\nCPUQuota=65%\nLimitAS=1G\nNice=8\n'
+            + common + install)}
     user_install='\n[Install]\nWantedBy=default.target\n'
     if module=='audio':return {'pi-control-audio.service':f'[Unit]\nDescription=Pi Control Audio and Bluetooth\nAfter=pipewire.service wireplumber.service\n[Service]\nWorkingDirectory={base}\nExecStart=/usr/bin/python3 -B {base}/audio_agent.py\nUMask=0077\nNoNewPrivileges=true\n{common}'+user_install}
     if module=='media':return {
@@ -240,6 +251,11 @@ def configure_module(base,root,module,config):
         if root==Path('/'):
             for part in (Path(home)/'.config',Path(home)/'.config/autostart'):os.chown(part,uid,-1)
     if module=='dns':configure_dns(base,root,config)
+    if module == 'display':
+        state = destination(root, config['data_mount'] + '/MiniDisplay')
+        state.mkdir(mode=0o700, exist_ok=True)
+        if root == Path('/'):
+            os.chown(state, uid, -1)
 
 
 def configure_fallback(root,config):

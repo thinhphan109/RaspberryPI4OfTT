@@ -1,0 +1,64 @@
+<section id="mini-display" class="view-section" aria-labelledby="mini-display-title">
+    <header class="page-header">
+        <div><h1 class="page-title" id="mini-display-title">Màn hình mini</h1>
+        <p class="text-muted">Màn phụ ST7789 · 2,4 inch</p></div>
+    </header>
+    <div class="mini-workspace">
+        <div class="mini-preview">
+            <div class="mini-bezel">
+                <canvas id="mini-screen" width="320" height="240" role="img" aria-label="Bản xem trước màn hình mini"></canvas>
+                <video id="mini-clip" width="320" height="240" muted loop playsinline controls aria-label="Video trên màn hình mini" hidden></video>
+                <div id="mini-ambient" class="mini-ambient" aria-hidden="true" hidden></div>
+            </div>
+            <div class="mini-preview-meta"><span>320 × 240</span><span id="mini-source">Xem trước</span></div>
+            <div class="mini-situation">
+                <label for="mini-mode">Tình huống xem trước</label>
+                <select id="mini-mode">
+                    <option value="live">Dữ liệu từ Pi</option>
+                    <option value="pending">Đang chờ Wi-Fi</option>
+                    <option value="hotspot">Hotspot đã bật</option>
+                    <option value="playing">Đang phát nhạc</option>
+                    <option value="power">Cảnh báo nguồn</option>
+                    <option value="hot">Nhiệt độ cao</option>
+                    <option value="offline">Mất kết nối mạng</option>
+                    <option value="disk">Ổ lưu trữ gần đầy</option>
+                    <option value="boot">Đang khởi động</option>
+                    <option value="shutdown">Đang tắt</option>
+                </select>
+            </div>
+            <p id="mini-reading" class="mini-reading" role="status"></p>
+        </div>
+        <div class="mini-settings">
+            <div id="mini-service-controls" class="mini-service">
+                <h2>Nội dung trên màn</h2>
+                <div class="mini-source-options" role="group" aria-label="Nguồn hiển thị">
+                    <button id="mini-use-summary" class="btn btn-outline" type="button" aria-pressed="true" disabled>Tổng quan</button>
+                    <button id="mini-use-clip" class="btn btn-outline" type="button" aria-pressed="false" disabled>Phát lặp</button>
+                </div>
+                <form id="mini-upload">
+                    <label for="mini-upload-file">Tải GIF hoặc video</label>
+                    <div class="mini-upload-row">
+                        <input id="mini-upload-file" type="file" accept=".gif,.mp4,.mov,.webm" required>
+                        <button id="mini-upload-submit" class="btn btn-outline" type="submit" disabled>Tải lên</button>
+                    </div>
+                    <small>GIF, MP4, MOV, WebM · 16 MiB · Phát tối đa 30 giây đầu</small>
+                </form>
+                <p id="mini-service-note" class="mini-reading" role="status">Đang kiểm tra service…</p>
+            </div>
+            <h2>Trang xem trước</h2>
+            <p class="text-muted">Bấm tên trang để xem. Dùng mũi tên để đổi thứ tự.</p>
+            <ol id="mini-pages" class="mini-pages"></ol>
+            <div class="mini-options">
+                <label for="mini-default">Trang mặc định</label>
+                <select id="mini-default"></select>
+                <label class="mini-check"><input id="mini-auto" type="checkbox"> Tự ưu tiên cứu hộ, nguồn yếu và nhạc đang phát</label>
+                <label class="mini-check"><input id="mini-motion" type="checkbox"> Hiệu ứng nhẹ trên màn hình</label>
+            </div>
+            <div class="hub-actions mini-actions">
+                <button id="mini-reset" class="btn btn-outline" type="button">Về mặc định</button>
+                <button id="mini-export" class="btn btn-outline" type="button">Tải cấu hình</button>
+            </div>
+            <p id="mini-storage" class="text-muted text-xs" role="status">Cấu hình được lưu trên trình duyệt này.</p>
+        </div>
+    </div>
+</section>

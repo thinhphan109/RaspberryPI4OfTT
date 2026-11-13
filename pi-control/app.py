@@ -27,11 +27,13 @@ import hub
 import media
 import camera
 import audio_client
+import mini_display_store
 import robotvision
 from service_catalog import help_rows
 import base64
 import hashlib
 import re
+from werkzeug.exceptions import RequestEntityTooLarge
 
 
 app = Flask(__name__)
@@ -188,10 +190,12 @@ def security_check():
     return None
 
 
-def check_csrf():
-    payload = request.get_json(silent=True) if request.is_json else request.form
-    if request.is_json and payload is not None and not isinstance(payload,dict):
-        raise RuntimeError("Dữ liệu CSRF không hợp lệ")
+def check_csrf(header_only=False):
+    payload = None
+    if not header_only:
+        payload = request.get_json(silent=True) if request.is_json else request.form
+        if request.is_json and payload is not None and not isinstance(payload,dict):
+            raise RuntimeError("Dữ liệu CSRF không hợp lệ")
     supplied = request.headers.get("X-CSRF-Token") or (payload or {}).get("csrf", "")
     if not isinstance(supplied,str): raise RuntimeError("CSRF token không hợp lệ")
     expected = session.get("csrf", "")
@@ -204,6 +208,70 @@ def check_csrf():
 @app.route('/robotvision/<path:path>',methods=['GET','POST'])
 def robotvision_page(path):
     return robotvision.proxy(request,session,Response)
+
+
+@app.route('/api/mini-display', methods=['GET', 'POST'])
+def mini_display_status():
+    if request.method == 'GET':
+        return jsonify(ok=True, data=mini_display_store.status())
+    try:
+        check_csrf()
+    except RuntimeError:
+        return jsonify(ok=False, error='Phiên làm việc không hợp lệ.'), 403
+    if not mini_display_store.ready():
+        return jsonify(ok=False, error='Service màn hình hoặc ổ dữ liệu chưa sẵn sàng.'), 503
+    try:
+        payload = request.get_json(silent=True)
+        mini_display_store.select(payload.get('source') if isinstance(payload, dict) else None)
+    except ValueError as error:
+        return jsonify(ok=False, error=str(error)), 400
+    except OSError:
+        return jsonify(ok=False, error='Không lưu được nguồn hiển thị.'), 503
+    return jsonify(ok=True, data=mini_display_store.status())
+
+
+@app.post('/api/mini-display/upload')
+def mini_display_upload():
+    request.max_content_length = mini_display_store.MAX_UPLOAD + 65536
+    try:
+        check_csrf(header_only=True)
+    except RuntimeError:
+        return jsonify(ok=False, error='Phiên làm việc không hợp lệ.'), 403
+    if not mini_display_store.ready():
+        return jsonify(ok=False, error='Service màn hình hoặc ổ dữ liệu chưa sẵn sàng.'), 503
+    try:
+        uploaded = request.files.get('clip')
+        if uploaded is None:
+            raise ValueError('Chọn một tệp GIF hoặc video.')
+        size = uploaded.stream.seek(0, os.SEEK_END)
+        uploaded.stream.seek(0)
+        mini_display_store.enqueue(uploaded.stream, uploaded.filename or '', size)
+    except RequestEntityTooLarge:
+        return jsonify(ok=False, error='Tệp vượt quá 16 MiB.'), 413
+    except ValueError as error:
+        return jsonify(ok=False, error=str(error)), 400
+    except BlockingIOError as error:
+        return jsonify(ok=False, error=str(error)), 409
+    except OSError:
+        return jsonify(ok=False, error='Không lưu được tệp trên ổ dữ liệu.'), 503
+    return jsonify(ok=True, data=mini_display_store.status()), 202
+
+
+@app.get('/api/mini-display/<kind>')
+def mini_display_content(kind):
+    assets = {
+        'frame.png': (mini_display_store.RUNTIME, 'image/png'),
+        'clip.mp4': (mini_display_store.STORE, 'video/mp4'),
+    }
+    if kind not in assets or not mini_display_store.ready():
+        return jsonify(ok=False, error='Nội dung chưa sẵn sàng.'), 404
+    folder, mimetype = assets[kind]
+    try:
+        response = send_file(folder / kind, mimetype=mimetype, conditional=True)
+    except FileNotFoundError:
+        return jsonify(ok=False, error='Nội dung chưa sẵn sàng.'), 404
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    return response
 
 
 @app.route('/api/media', methods=['GET','POST'])
